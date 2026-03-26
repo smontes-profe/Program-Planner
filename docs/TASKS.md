@@ -28,11 +28,11 @@ Status legend:
 
 ## Phase 1 - Organization and Access Foundation
 
-- [ ] Create SQL schema for `organizations`.
-- [ ] Create SQL schema for `organization_memberships`.
-- [ ] Create SQL schema for `profiles` with `is_platform_admin`.
-- [ ] Implement region catalog and `academic_year` normalization constraints.
-- [ ] Implement RLS base policies for:
+- [x] Create SQL schema for `organizations`.
+- [x] Create SQL schema for `organization_memberships`.
+- [x] Create SQL schema for `profiles` with `is_platform_admin`.
+- [x] Implement region catalog and `academic_year` normalization constraints.
+- [x] Implement RLS base policies for:
   - platform admin global access
   - org manager organization access
   - teacher own/write access
