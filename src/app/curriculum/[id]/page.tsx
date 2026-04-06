@@ -8,6 +8,9 @@ import { AddRAButton } from "./_components/AddRAButton";
 import { AddCEButton } from "./_components/AddCEButton";
 import { EditRAButton } from "./_components/EditRAButton";
 import { DeleteRAButton } from "./_components/DeleteRAButton";
+import { EditCEButton } from "./_components/EditCEButton";
+import { DeleteCEButton } from "./_components/DeleteCEButton";
+import { BulkAddCEButton } from "./_components/BulkAddCEButton";
 import Link from "next/link";
 import { MoveLeft, Edit, Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -38,6 +41,14 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
   }
 
   const isDraft = template.status === 'draft';
+
+  const badgeVariant = template.status === 'published' 
+    ? 'success' 
+    : (template.status === 'deprecated' ? 'warning' : 'neutral');
+    
+  const badgeLabel = template.status === 'published' 
+    ? 'Publicado' 
+    : (template.status === 'deprecated' ? 'Depreciado' : 'Borrador');
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-5xl">
@@ -88,8 +99,8 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
             </div>
           </div>
           <div className="flex items-center gap-3 self-end md:self-center">
-            <Badge variant={template.status === 'published' ? 'success' : template.status === 'deprecated' ? 'warning' : 'neutral'}>
-               {template.status === 'published' ? 'Publicado' : template.status === 'deprecated' ? 'Depreciado' : 'Borrador'}
+            <Badge variant={badgeVariant}>
+               {badgeLabel}
             </Badge>
           </div>
         </div>
@@ -130,23 +141,32 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
                            <div className="flex items-center justify-between">
                               <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Criterios de Evaluación</h4>
                               {isDraft && (
-                                <AddCEButton templateId={id} raId={ra.id} />
+                                <div className="flex items-center">
+                                  <AddCEButton templateId={id} raId={ra.id} />
+                                  <BulkAddCEButton templateId={id} raId={ra.id} />
+                                </div>
                               )}
                            </div>
                            
                            {ra.ces && ra.ces.length > 0 ? (
                               <div className="grid gap-2">
-                                {ra.ces.map((ce: any) => (
-                                   <div key={ce.id} className="p-3 bg-white border border-zinc-100 rounded-lg flex gap-4 dark:bg-zinc-950 dark:border-zinc-900 hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors">
-                                      <div className="font-mono text-zinc-400 text-sm font-bold pt-0.5">{ce.code}</div>
-                                      <div className="flex-1 space-y-1">
-                                         <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{ce.description}</p>
-                                         <div className="text-[10px] uppercase font-bold text-zinc-400">
-                                           Peso en RA: {ce.weight_in_ra}%
+                                 {ra.ces.map((ce: any) => (
+                                    <div key={ce.id} className="group p-3 bg-white border border-zinc-100 rounded-lg flex gap-4 dark:bg-zinc-950 dark:border-zinc-900 hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors">
+                                       <div className="font-mono text-zinc-400 text-sm font-bold pt-0.5">{ce.code}</div>
+                                       <div className="flex-1 space-y-1">
+                                          <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{ce.description}</p>
+                                          <div className="text-[10px] uppercase font-bold text-zinc-400">
+                                            Peso en RA: {ce.weight_in_ra}%
+                                          </div>
+                                       </div>
+                                       {isDraft && (
+                                         <div className="flex items-start gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                            <EditCEButton templateId={id} ce={ce} />
+                                            <DeleteCEButton templateId={id} ceId={ce.id} />
                                          </div>
-                                      </div>
-                                   </div>
-                                ))}
+                                       )}
+                                    </div>
+                                 ))}
                               </div>
                            ) : (
                               <p className="text-xs text-zinc-400 italic">No hay criterios definidos para este RA.</p>
