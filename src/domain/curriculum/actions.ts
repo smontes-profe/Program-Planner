@@ -117,6 +117,28 @@ export async function addCE(templateId: string, raId: string, payload: { code: s
 }
 
 /**
+ * Add multiple Criteris d'Avaluació (CE) to an RA
+ */
+export async function addMultipleCE(templateId: string, raId: string, payloads: { code: string; description: string; weight: number }[]): Promise<ActionResponse<any>> {
+  const supabase = await createClient();
+  
+  const items = payloads.map(payload => ({
+    template_ra_id: raId,
+    code: payload.code,
+    description: payload.description,
+    weight_in_ra: payload.weight
+  }));
+
+  const { error } = await supabase
+    .from("template_ce")
+    .insert(items);
+
+  if (error) return { ok: false, error: `Error al añadir múltiples CE: ${error.message}` };
+  revalidatePath(`/curriculum/${templateId}`);
+  return { ok: true, data: null };
+}
+
+/**
  * Update the status of a Curriculum Template
  */
 async function updateTemplateStatus(id: string, status: CurriculumStatus): Promise<ActionResponse<CurriculumTemplate>> {
@@ -343,6 +365,40 @@ export async function deleteRA(templateId: string, raId: string): Promise<Action
     .eq("template_id", templateId);
 
   if (error) return { ok: false, error: `Error al eliminar RA: ${error.message}` };
+  revalidatePath(`/curriculum/${templateId}`);
+  return { ok: true, data: null };
+}
+
+/**
+ * Update an existing CE
+ */
+export async function updateCE(templateId: string, ceId: string, payload: { code: string; description: string; weight: number }): Promise<ActionResponse<any>> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("template_ce")
+    .update({
+      code: payload.code,
+      description: payload.description,
+      weight_in_ra: payload.weight
+    })
+    .eq("id", ceId);
+
+  if (error) return { ok: false, error: `Error al actualizar CE: ${error.message}`, fields: payload };
+  revalidatePath(`/curriculum/${templateId}`);
+  return { ok: true, data: null };
+}
+
+/**
+ * Delete a CE
+ */
+export async function deleteCE(templateId: string, ceId: string): Promise<ActionResponse<any>> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("template_ce")
+    .delete()
+    .eq("id", ceId);
+
+  if (error) return { ok: false, error: `Error al eliminar CE: ${error.message}` };
   revalidatePath(`/curriculum/${templateId}`);
   return { ok: true, data: null };
 }
