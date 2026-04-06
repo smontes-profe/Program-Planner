@@ -120,7 +120,7 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
           placeholder="Ej: Programación, Bases de Datos..." 
           className="border-zinc-200 dark:border-zinc-800"
           required
-          defaultValue={state.fields?.module_name}
+          defaultValue={state.fields?.module_name ?? ""}
         />
         {fieldErrors.module_name && (
           <p className="text-xs text-destructive">{fieldErrors.module_name[0]}</p>
@@ -135,7 +135,7 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
             name="module_code" 
             placeholder="Ej: 0373" 
             required 
-            defaultValue={state.fields?.module_code}
+            defaultValue={state.fields?.module_code ?? ""}
           />
           {fieldErrors.module_code && <p className="text-xs text-destructive">{fieldErrors.module_code[0]}</p>}
         </div>
@@ -147,7 +147,7 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
             name="academic_year" 
             placeholder="2026/2027" 
             required 
-            defaultValue={state.fields?.academic_year}
+            defaultValue={state.fields?.academic_year ?? ""}
           />
           {fieldErrors.academic_year && <p className="text-xs text-destructive">{fieldErrors.academic_year[0]}</p>}
         </div>

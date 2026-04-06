@@ -67,7 +67,7 @@ export function AuthForm() {
                   name="full_name" 
                   placeholder="Ej: David García" 
                   required={mode === "signup"}
-                  defaultValue={state.fields?.full_name}
+                  defaultValue={state.fields?.full_name ?? ""}
                   className="h-10 border-zinc-200 dark:border-zinc-800 focus:ring-emerald-500"
                 />
               </div>
@@ -81,7 +81,7 @@ export function AuthForm() {
                 type="email" 
                 placeholder="nombre@ejemplo.com" 
                 required 
-                defaultValue={state.fields?.email}
+                defaultValue={state.fields?.email ?? ""}
                 className="h-10 border-zinc-200 dark:border-zinc-800 focus:ring-emerald-500"
               />
             </div>

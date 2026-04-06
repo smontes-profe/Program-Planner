@@ -49,7 +49,7 @@ export function AddCEButton({ templateId, raId }: AddCEButtonProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="code">Código</Label>
-              <Input id="code" name="code" placeholder="a" required defaultValue={state.fields?.code} />
+              <Input id="code" name="code" placeholder="a" required defaultValue={state.fields?.code ?? ""} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="weight">Peso (%)</Label>
@@ -61,7 +61,7 @@ export function AddCEButton({ templateId, raId }: AddCEButtonProps) {
                 id="description" 
                 name="description" 
                 rows={4}
-                defaultValue={state.fields?.description}
+                defaultValue={state.fields?.description ?? ""}
                 className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:border-zinc-800"
                 required
               />
