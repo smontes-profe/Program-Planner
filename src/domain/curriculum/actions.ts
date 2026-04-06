@@ -105,7 +105,7 @@ export async function addCE(templateId: string, raId: string, payload: { code: s
   const { error } = await supabase
     .from("template_ce")
     .insert({
-      ra_id: raId,
+      template_ra_id: raId,
       code: payload.code,
       description: payload.description,
       weight_in_ra: payload.weight
