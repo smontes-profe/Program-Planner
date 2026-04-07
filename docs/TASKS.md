@@ -78,9 +78,26 @@ Status legend:
   - `owner_profile_id`
   - `visibility_scope`
   - lineage fields
-- [ ] Implement plan RA/CE CRUD (cloned from template).
-- [ ] Implement weight assignment for RAs and CEs in the teaching plan.
-- [ ] Implement hard invariant checks (RA sum = 100%, CE sum per RA = 100%).
+
+### Phase 3A - Plan Base + Resumen de Pesos ✅
+
+- [x] Implement plan RA/CE CRUD (cloned from template via deep copy).
+- [x] Implement global weight assignment for RAs in the teaching plan.
+- [x] Implement trimester presence flags (active_t1/t2/t3) with auto-computed weights.
+- [x] `/plans` list page with plan cards and status.
+- [x] `/plans/[id]` detail page with Currículo tab (editable RA/CE clone) and Pesos tab.
+- [x] Enable homepage link to /plans.
+
+### Phase 3B - Unidades de Trabajo e Instrumentos
+
+- [ ] Implement `didactic_units` schema with trimester assignment.
+- [ ] Implement `didactic_unit_ra_coverage` (which RAs a UT covers).
+- [ ] `/plans/[id]` tab: Unidades de Trabajo (CRUD + RA/CE assignment per UT).
+- [ ] Implement `evaluation_instruments` schema linked to a UT.
+- [ ] Implement `instrument_ce_weight` (which CEs an instrument covers and with what %).
+- [ ] `/plans/[id]` tab: Instrumentos (CRUD + CE weight assignment per instrument).
+- [ ] Computed weights panel: target vs. real comparison per RA (global + per trimester).
+
 - [ ] Implement plan status transitions (`draft`, `ready`, `published`, `archived`).
 
 ## Phase 4 - Collaboration and Visibility
