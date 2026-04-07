@@ -50,8 +50,9 @@ erDiagram
     TEACHING_PLAN ||--o{ PLAN_RA : contains
     PLAN_RA ||--o{ PLAN_CE : contains
 
-    TEACHING_PLAN ||--o{ DIDACTIC_UNIT : includes
-    DIDACTIC_UNIT }o--o{ PLAN_CE : covers
+    TEACHING_PLAN ||--o{ TEACHING_UNIT : includes
+    TEACHING_UNIT }o--o{ PLAN_RA : covers
+    TEACHING_UNIT ||--o{ PLAN_INSTRUMENT : evaluated_by
 
     TEACHING_PLAN ||--o{ EVALUATION_INSTRUMENT : defines
     EVALUATION_INSTRUMENT ||--o{ INSTRUMENT_CE_WEIGHT : maps
@@ -100,6 +101,7 @@ erDiagram
         string version
         string status "draft|published|deprecated"
         string source_type "manual|pdf_assisted"
+        int hours_total
         timestamptz created_at
     }
 
@@ -139,7 +141,10 @@ erDiagram
         uuid plan_id FK
         string code
         text description
-        numeric weight_in_plan
+        numeric weight_global
+        boolean active_t1
+        boolean active_t2
+        boolean active_t3
     }
 
     PLAN_CE {
@@ -150,14 +155,39 @@ erDiagram
         numeric weight_in_ra
     }
 
-    DIDACTIC_UNIT {
+    TEACHING_UNIT {
         uuid id PK
         uuid plan_id FK
         string code
         string title
-        text description
         string trimester "T1|T2|T3"
-        int display_order
+        int hours
+        int order_index
+    }
+
+    PLAN_INSTRUMENT {
+        uuid id PK
+        uuid plan_id FK
+        string type "exam|practice|project|oral|other"
+        string name
+        text description
+        timestamptz created_at
+    }
+
+    PLAN_INSTRUMENT_CE {
+        uuid instrument_id FK
+        uuid plan_ce_id FK
+        numeric weight
+    }
+
+    PLAN_UNIT_RA {
+        uuid unit_id FK
+        uuid plan_ra_id FK
+    }
+
+    PLAN_INSTRUMENT_UNIT {
+        uuid instrument_id FK
+        uuid unit_id FK
     }
 
     EVALUATION_INSTRUMENT {
