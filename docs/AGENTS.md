@@ -27,7 +27,8 @@ Act as a senior full-stack engineer with FP teaching domain awareness (DAM/DAW c
 4. `docs/UI_UX.md`
 5. `docs/QA_AUTOMATION.md`
 6. `docs/TASKS.md`
-7. Target code/files for the selected task
+7. `docs/MEMORY.md`
+8. Target code/files for the selected task
 
 ## 3.1 Locked Architecture Decisions
 
@@ -122,23 +123,6 @@ A task is done only if all are true:
 4. No type errors.
 5. No unhandled security impact (auth/RLS/exposure).
 
-## 7. Branch and PR Discipline
+## 6. Persistent memory
 
-- Feature branches: `feature/<scope>-<short-name>`.
-- Bugfix branches: `fix/<scope>-<short-name>`.
-- Commit style recommendation: Conventional Commits.
-- PR template location: `.github/pull_request_template.md`.
-- PR must include:
-  - what changed
-  - why it changed
-  - how it was tested
-  - docs impact
-134: 
-135: ## 8. Escalation Rules
-136: 
-137: Escalate to user decision when:
-138: 
-139: - A choice affects data compatibility or migration complexity.
-140: - A choice affects grading semantics.
-141: - A choice changes auth/security posture.
-142: - A choice introduces third-party costs or lock-in.
+When reciving orders from a human developer, make sure to take note of the importante changes in behavior or way of doing things in your `docs/MEMORY.md` file.

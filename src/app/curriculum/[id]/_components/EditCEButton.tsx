@@ -21,7 +21,6 @@ export function EditCEButton({ templateId, ce }: EditCEButtonProps) {
       const payload = {
         code: formData.get("code") as string,
         description: formData.get("description") as string,
-        weight: 0, // Hidden for now
       };
       
       const res = await updateCE(templateId, ce.id, payload);

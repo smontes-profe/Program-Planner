@@ -108,7 +108,6 @@ erDiagram
         uuid template_id FK
         string code
         text description
-        numeric weight_in_template
     }
 
     TEMPLATE_CE {
@@ -116,7 +115,6 @@ erDiagram
         uuid template_ra_id FK
         string code
         text description
-        numeric weight_in_ra
     }
 
     TEACHING_PLAN {
@@ -248,8 +246,8 @@ sequenceDiagram
 ## 7. Versioning and Immutability
 
 - Template unique key: `organization_id + region_code + module_code + academic_year + version`.
-- `published` templates are immutable.
-- Any functional update requires new version row (for example `v2`).
+- `published` templates are mutable for corrections (e.g., matching BOJA updates).
+- Curriculum modifications do *not* retroactively affect existing `teaching_plans` due to the Deep Copy architecture.
 
 ## 8. Deployment Topology
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createTemplateDraftAction } from "@/domain/curriculum/actions";
+import { createTemplateDraftAction, updateTemplateDraftAction } from "@/domain/curriculum/actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -18,27 +18,45 @@ import { useRouter } from "next/navigation";
 interface CurriculumFormProps {
   readonly regions: { code: string; name: string }[];
   readonly organizations: { id: string; name: string }[];
+  readonly templateId?: string;
+  readonly initialData?: any;
 }
 
-export function CurriculumForm({ regions, organizations }: CurriculumFormProps) {
+export function CurriculumForm({ regions, organizations, templateId, initialData }: CurriculumFormProps) {
   const router = useRouter();
   
   const [state, formAction, isPending] = useActionState(
     async (prevState: any, formData: FormData) => {
+      if (templateId) {
+        return updateTemplateDraftAction(templateId, prevState, formData);
+      }
       return createTemplateDraftAction(prevState, formData);
     },
     { ok: false, error: "" } as any
   );
 
-  // Controlled states initialized from state.fields if available
-  const [selectedRegion, setSelectedRegion] = useState<string>(state.fields?.region_code || "");
-  const [selectedVisibility, setSelectedVisibility] = useState<string>(state.fields?.visibility_scope || "organization");
+  // Fully controlled state for all fields
+  const [formData, setFormData] = useState({
+    module_name: initialData?.module_name || "",
+    module_code: initialData?.module_code || "",
+    academic_year: initialData?.academic_year || "",
+    version: initialData?.version || "v1",
+    region_code: initialData?.region_code || "",
+    visibility_scope: initialData?.visibility_scope || "organization"
+  });
 
   // Sync state if form re-renders with new state.fields after error
   useEffect(() => {
     if (state.fields) {
-      if (state.fields.region_code) setSelectedRegion(state.fields.region_code);
-      if (state.fields.visibility_scope) setSelectedVisibility(state.fields.visibility_scope);
+      setFormData(prev => ({
+        ...prev,
+        module_name: state.fields.module_name ?? prev.module_name,
+        module_code: state.fields.module_code ?? prev.module_code,
+        academic_year: state.fields.academic_year ?? prev.academic_year,
+        version: state.fields.version ?? prev.version,
+        region_code: state.fields.region_code ?? prev.region_code,
+        visibility_scope: state.fields.visibility_scope ?? prev.visibility_scope
+      }));
     }
   }, [state.fields]);
 
@@ -49,6 +67,11 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
   }, [state, router]);
 
   const fieldErrors = state.details || {};
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   return (
     <form action={formAction} className="space-y-6 text-zinc-900 dark:text-zinc-50">
@@ -80,8 +103,8 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
           <Label htmlFor="region_code">Región (CCAA)</Label>
           <Select 
             name="region_code" 
-            value={selectedRegion} 
-            onValueChange={(val) => setSelectedRegion(val || "")}
+            value={formData.region_code} 
+            onValueChange={(val) => setFormData(prev => ({ ...prev, region_code: val || "" }))}
           >
             <SelectTrigger id="region_code" className="w-full h-10 border-zinc-200 dark:border-zinc-800">
               <SelectValue placeholder="Selecciona región" />
@@ -108,7 +131,8 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
           placeholder="Ej: Programación, Bases de Datos..." 
           className="border-zinc-200 dark:border-zinc-800"
           required
-          defaultValue={state.fields?.module_name ?? ""}
+          value={formData.module_name}
+          onChange={handleInputChange}
         />
         {fieldErrors.module_name && (
           <p className="text-xs text-destructive">{fieldErrors.module_name[0]}</p>
@@ -123,7 +147,8 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
             name="module_code" 
             placeholder="Ej: 0373" 
             required 
-            defaultValue={state.fields?.module_code ?? ""}
+            value={formData.module_code}
+            onChange={handleInputChange}
           />
           {fieldErrors.module_code && <p className="text-xs text-destructive">{fieldErrors.module_code[0]}</p>}
         </div>
@@ -135,7 +160,8 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
             name="academic_year" 
             placeholder="2026/2027" 
             required 
-            defaultValue={state.fields?.academic_year ?? ""}
+            value={formData.academic_year}
+            onChange={handleInputChange}
           />
           {fieldErrors.academic_year && <p className="text-xs text-destructive">{fieldErrors.academic_year[0]}</p>}
         </div>
@@ -145,7 +171,8 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
           <Input 
             id="version" 
             name="version" 
-            defaultValue={state.fields?.version || "v1"} 
+            value={formData.version}
+            onChange={handleInputChange}
             required 
           />
         </div>
@@ -155,8 +182,8 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
         <Label htmlFor="visibility_scope">Visibilidad</Label>
         <Select 
           name="visibility_scope" 
-          value={selectedVisibility} 
-          onValueChange={(val) => setSelectedVisibility(val || "organization")}
+          value={formData.visibility_scope} 
+          onValueChange={(val) => setFormData(prev => ({ ...prev, visibility_scope: val || "organization" }))}
         >
           <SelectTrigger id="visibility_scope" className="w-full h-10 border-zinc-200 dark:border-zinc-800">
             <SelectValue />
@@ -183,7 +210,7 @@ export function CurriculumForm({ regions, organizations }: CurriculumFormProps) 
           className="px-8 min-w-[140px]"
           disabled={isPending}
         >
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear Borrador"}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (templateId ? "Guardar Cambios" : "Crear Borrador")}
         </Button>
       </div>
     </form>

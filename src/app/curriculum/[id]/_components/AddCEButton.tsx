@@ -21,7 +21,6 @@ export function AddCEButton({ templateId, raId }: AddCEButtonProps) {
       const payload = {
         code: formData.get("code") as string,
         description: formData.get("description") as string,
-        weight: 0,
       };
       
       const res = await addCE(templateId, raId, payload);
