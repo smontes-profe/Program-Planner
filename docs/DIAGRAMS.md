@@ -70,7 +70,10 @@ classDiagram
     class LearningResult {
       +id: UUID
       +code: string
-      +weightInPlan: number
+      +weightGlobal: number
+      +activeT1: boolean
+      +activeT2: boolean
+      +activeT3: boolean
     }
 
     class EvaluationCriterion {
@@ -79,10 +82,11 @@ classDiagram
       +weightInRa: number
     }
 
-    class DidacticUnit {
+    class TeachingUnit {
       +id: UUID
       +code: string
       +trimester: Trimester
+      +hours: number
     }
 
     class EvaluationInstrument {
@@ -108,8 +112,8 @@ classDiagram
     Profile "1" --> "*" TeachingPlan : owns
     TeachingPlan "1" --> "*" LearningResult : contains
     LearningResult "1" --> "*" EvaluationCriterion : contains
-    TeachingPlan "1" --> "*" DidacticUnit : includes
-    DidacticUnit "*" --> "*" EvaluationCriterion : covers
+    TeachingPlan "1" --> "*" TeachingUnit : includes
+    TeachingUnit "*" --> "*" LearningResult : covers
     TeachingPlan "1" --> "*" EvaluationInstrument : defines
     EvaluationInstrument "1" --> "*" InstrumentCriterionWeight : maps
     EvaluationCriterion "1" --> "*" InstrumentCriterionWeight : weightedIn

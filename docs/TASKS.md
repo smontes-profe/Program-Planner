@@ -90,8 +90,8 @@ Status legend:
 
 ### Phase 3B - Unidades de Trabajo e Instrumentos
 
-- [ ] Implement `didactic_units` schema with trimester assignment.
-- [ ] Implement `didactic_unit_ra_coverage` (which RAs a UT covers).
+- [ ] Implement `plan_teaching_unit` schema with trimester assignment and hours field.
+- [ ] Implement `plan_unit_ra` coverage table (which RAs a UT covers).
 - [ ] `/plans/[id]` tab: Unidades de Trabajo (CRUD + RA/CE assignment per UT).
 - [ ] Implement `evaluation_instruments` schema linked to a UT.
 - [ ] Implement `instrument_ce_weight` (which CEs an instrument covers and with what %).
@@ -111,9 +111,9 @@ Status legend:
   - `company`
 - [ ] Ensure no automatic source sync after import.
 
-## Phase 5 - Didactic Planning
+## Phase 5 - Teaching Planning (UTs e Instrumentos)
 
-- [ ] CRUD for didactic units (UT).
+- [ ] CRUD for teaching units / Unidades de Trabajo (UT).
 - [ ] Map UT <-> CE (many-to-many).
 - [ ] Assign UT to trimester (`T1`, `T2`, `T3`).
 - [ ] Build trimester coverage summaries.
