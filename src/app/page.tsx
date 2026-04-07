@@ -1,4 +1,3 @@
-import { buttonVariants } from "@/components/ui/button-variants";
 import Link from "next/link";
 import { BookOpen, Table, GraduationCap, ChevronRight } from "lucide-react";
 
@@ -43,17 +42,17 @@ export default function Home() {
 
           <Link 
             href="/plans" 
-            className="group flex flex-col items-start p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:shadow-md transition-all text-left opacity-60 grayscale cursor-not-allowed pointer-events-none"
+            className="group flex flex-col items-start p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-500/30 transition-all text-left"
           >
-            <div className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-xl mb-4">
-               <Table className="h-6 w-6 text-zinc-500 dark:text-zinc-400" />
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300">
+               <Table className="h-6 w-6 text-emerald-600 dark:text-emerald-500" />
             </div>
             <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">Programaciones</h3>
             <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-4">
-              (Próximamente) Crea planes de enseñanza basados en las plantillas publicadas.
+              Crea planes de enseñanza con pesos, UTs e instrumentos de evaluación basados en currículos publicados.
             </p>
-            <span className="inline-flex px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-[10px] uppercase font-bold text-zinc-500">
-               Próxima Fase
+            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500 font-bold text-sm">
+              Acceder <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </span>
           </Link>
         </div>

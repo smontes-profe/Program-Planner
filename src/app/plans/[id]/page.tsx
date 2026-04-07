@@ -1,0 +1,73 @@
+import { getPlan } from "@/domain/teaching-plan/actions";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { MoveLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { PlanTabs } from "./_components/PlanTabs";
+
+interface PlanDetailPageProps {
+  readonly params: Promise<{ id: string }>;
+}
+
+export default async function PlanDetailPage({ params }: PlanDetailPageProps) {
+  const { id } = await params;
+  const result = await getPlan(id);
+
+  if (!result.ok || !result.data) {
+    return notFound();
+  }
+
+  const plan = result.data;
+
+  let badgeVariant: "success" | "warning" | "neutral" | "default" = "neutral";
+  let badgeLabel = "Borrador";
+
+  if (plan.status === "ready") { badgeVariant = "default"; badgeLabel = "Lista"; }
+  else if (plan.status === "published") { badgeVariant = "success"; badgeLabel = "Publicada"; }
+  else if (plan.status === "archived") { badgeVariant = "warning"; badgeLabel = "Archivada"; }
+
+  return (
+    <div className="container mx-auto py-8 px-4 max-w-5xl">
+      <div className="flex flex-col gap-6">
+        {/* Top bar */}
+        <div className="flex justify-between items-start">
+          <Link
+            href="/plans"
+            className="flex items-center text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+          >
+            <MoveLeft className="mr-2 h-4 w-4" />
+            Mis Programaciones
+          </Link>
+          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+        </div>
+
+        {/* Header */}
+        <div className="border-b border-zinc-200 dark:border-zinc-800 pb-6">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            {plan.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-zinc-500 text-sm font-medium mt-2">
+            <span className="font-mono bg-zinc-100 px-1.5 py-0.5 rounded dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+              {plan.module_code}
+            </span>
+            <span>•</span>
+            <span>{plan.academic_year}</span>
+            <span>•</span>
+            <span className="capitalize">{plan.region_code}</span>
+            {plan.source_template_id && (
+              <>
+                <span>•</span>
+                <span className="text-xs text-zinc-400">
+                  Importado desde v{plan.source_version}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <PlanTabs plan={plan} />
+      </div>
+    </div>
+  );
+}
