@@ -39,7 +39,6 @@ export interface TemplateRA {
   template_id: string;
   code: string;
   description: string;
-  weight_in_template: number;
   created_at: string;
 }
 
@@ -51,7 +50,6 @@ export interface TemplateCE {
   template_ra_id: string;
   code: string;
   description: string;
-  weight_in_ra: number;
   created_at: string;
 }
 

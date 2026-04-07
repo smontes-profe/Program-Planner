@@ -30,7 +30,6 @@ export const templateRASchema = z.object({
   template_id: z.string().uuid(),
   code: z.string().min(1).max(50),
   description: z.string().min(1),
-  weight_in_template: z.coerce.number().min(0, "Mínimo 0").max(100, "Máximo 100"),
 });
 
 /**
@@ -41,7 +40,6 @@ export const templateCESchema = z.object({
   template_ra_id: z.string().uuid(),
   code: z.string().min(1).max(50),
   description: z.string().min(1),
-  weight_in_ra: z.coerce.number().min(0, "Mínimo 0").max(100, "Máximo 100"),
 });
 
 /**
@@ -55,36 +53,3 @@ export const fullTemplateSchema = curriculumTemplateSchema.extend({
   ).optional(),
 });
 
-/**
- * Validation for percentage sums
- */
-export function validateWeights(template: any): { 
-  isValid: boolean; 
-  errors: string[] 
-} {
-  const errors: string[] = [];
-  
-  if (!template.ras || template.ras.length === 0) return { isValid: true, errors: [] };
-
-  const totalRAWeight = template.ras.reduce((sum: number, ra: any) => sum + (ra.weight_in_template || 0), 0);
-  
-  // Use a small epsilon for floating point comparison if needed, 
-  // but business requirement usually expects precise 100 (stored as numeric/decimal)
-  if (totalRAWeight !== 100) {
-    errors.push(`La suma de los pesos de los RA debe ser 100 (actual: ${totalRAWeight})`);
-  }
-
-  template.ras.forEach((ra: any, index: number) => {
-    if (ra.ces && ra.ces.length > 0) {
-      const totalCEWeight = ra.ces.reduce((sum: number, ce: any) => sum + (ce.weight_in_ra || 0), 0);
-      if (totalCEWeight !== 100) {
-        errors.push(`En RA [${ra.code || index + 1}], la suma de los pesos de los CE debe ser 100 (actual: ${totalCEWeight})`);
-      }
-    }
-  });
-
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}

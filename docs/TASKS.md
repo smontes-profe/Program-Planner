@@ -59,8 +59,17 @@ Status legend:
 - [x] Debe de poder hacerse CRUD de criterios de evaluación para un RA. Ahora mismo solo se pueden crear. no se pueden editar ni eliminar.
 - [x] EN la vista de un RA, además del botón de"Añadir Criterio", debería haber un "Añadir criterios" que permita añadir varios Criterios a la vez. El sistema debe identificar cuando hay un patrón típico de nombre de criterior (ej. "a) ","b) ".., separar usando esos patrones, usar el patrón ("a", "b") como código del criterio y luego el texto siguiente como la descripción. Por ejemplo, si pego "a) Se han caracterizado y diferenciado los modelos de ejecución de código en el servidor y en el cliente web. b) Se han identificado las capacidades y mecanismos de ejecución de código de los navegadores web." debería crear dos criterios, uno con código "a" y descripción "Se han caracterizado y diferenciado los modelos de ejecución de código en el servidor y en el cliente web." y otro con código "b" y descripción "Se han identificado las capacidades y mecanismos de ejecución de código de los navegadores web."
 - [x] Permitir añadir RRAAs (y sus CCEE) en bloque de acuerdo a @specs.md (### Añadiendo RRAA en bloque).
-- [ ] El botón de elimimnar un RA no parece funcionar. Habría que asegurar que se puede eliminar un RA y sus CCEE asociados.
-- [ ] En la vista de un currículo, el botón de "Editar datos" no funciona.Intenta ir a "/edit" pero la página no existe.
+- [x] El botón de elimimnar un RA: habría que asegurar que se puede eliminar un RA y sus CCEE asociados.
+- [x] En la vista de un currículo, el botón de "Editar datos" no funciona.Intenta ir a "/edit" pero la página no existe.
+
+## Phase 2.6 - Curriculum Refactoring (Pedagogical Alignment)
+
+- [x] Remove weight-based constraints from curriculum templates (RAs and CEs).
+- [x] Update domain schemas and types to remove weight fields.
+- [x] Relax immutability of published templates to allow for corrections.
+- [x] Simplify curriculum UI: remove weight displays and inputs.
+- [x] Enable curriculum deletion if no active teaching plans are dependent on it.
+- [x] Update ARCHITECTURE.md and ERD to reflect the decoupled model.
 
 ## Phase 3 - Teaching Plan Core
 
@@ -69,8 +78,9 @@ Status legend:
   - `owner_profile_id`
   - `visibility_scope`
   - lineage fields
-- [ ] Implement plan RA/CE CRUD.
-- [ ] Implement hard invariant checks (RA=100, CE=100).
+- [ ] Implement plan RA/CE CRUD (cloned from template).
+- [ ] Implement weight assignment for RAs and CEs in the teaching plan.
+- [ ] Implement hard invariant checks (RA sum = 100%, CE sum per RA = 100%).
 - [ ] Implement plan status transitions (`draft`, `ready`, `published`, `archived`).
 
 ## Phase 4 - Collaboration and Visibility

@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { PublishButton } from "./_components/PublishButton";
@@ -12,8 +11,9 @@ import { DeleteRAButton } from "./_components/DeleteRAButton";
 import { EditCEButton } from "./_components/EditCEButton";
 import { DeleteCEButton } from "./_components/DeleteCEButton";
 import { BulkAddCEButton } from "./_components/BulkAddCEButton";
+import { DeleteCurriculumButton } from "./_components/DeleteCurriculumButton";
 import Link from "next/link";
-import { MoveLeft, Edit, Trash2 } from "lucide-react";
+import { MoveLeft, Edit } from "lucide-react";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -43,13 +43,16 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
 
   const isDraft = template.status === 'draft';
 
-  const badgeVariant = template.status === 'published' 
-    ? 'success' 
-    : (template.status === 'deprecated' ? 'warning' : 'neutral');
-    
-  const badgeLabel = template.status === 'published' 
-    ? 'Publicado' 
-    : (template.status === 'deprecated' ? 'Depreciado' : 'Borrador');
+  let badgeVariant: 'success' | 'warning' | 'neutral' = 'neutral';
+  let badgeLabel = 'Borrador';
+
+  if (template.status === 'published') {
+    badgeVariant = 'success';
+    badgeLabel = 'Publicado';
+  } else if (template.status === 'deprecated') {
+    badgeVariant = 'warning';
+    badgeLabel = 'Depreciado';
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-5xl">
@@ -63,20 +66,14 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
             Volver
           </Link>
           <div className="flex gap-2">
-            {isDraft && (
-              <>
-                <Link 
-                  href={`/curriculum/${id}/edit`} 
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex items-center")}
-                >
-                  <Edit className="mr-2 h-4 w-4" /> Editar Datos
-                </Link>
-                <PublishButton templateId={id} />
-              </>
-            )}
-            <Button variant="destructive" size="sm" className="opacity-70 hover:opacity-100 h-9">
-               <Trash2 className="h-4 w-4" />
-            </Button>
+            <Link 
+              href={`/curriculum/${id}/edit`} 
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex items-center")}
+            >
+              <Edit className="mr-2 h-4 w-4" /> Editar Datos
+            </Link>
+            {isDraft && <PublishButton templateId={id} />}
+            <DeleteCurriculumButton templateId={id} />
           </div>
         </div>
 
@@ -110,12 +107,10 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
           <section className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Resultados de Aprendizaje (RA)</h2>
-              {isDraft && (
-                <div className="flex items-center gap-2">
-                  <BulkAddRAButton templateId={id} />
-                  <AddRAButton templateId={id} />
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <BulkAddRAButton templateId={id} />
+                <AddRAButton templateId={id} />
+              </div>
             </div>
 
             {template.ras && template.ras.length > 0 ? (
@@ -125,16 +120,11 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
                       <div className="bg-zinc-50 px-6 py-3 flex justify-between items-center border-b border-zinc-100 dark:bg-zinc-900/50 dark:border-zinc-800">
                         <div className="flex items-baseline gap-3">
                            <span className="text-lg font-bold font-mono text-zinc-400">RA {ra.code}</span>
-                           <span className="text-xs font-semibold px-1.5 py-0.5 bg-zinc-200 rounded dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                             Peso: {ra.weight_in_template}%
-                           </span>
                         </div>
-                        {isDraft && (
-                           <div className="flex items-center gap-1">
-                             <EditRAButton templateId={id} ra={ra} />
-                             <DeleteRAButton templateId={id} raId={ra.id} />
-                           </div>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <EditRAButton templateId={id} ra={ra} />
+                          <DeleteRAButton templateId={id} raId={ra.id} />
+                        </div>
                       </div>
                       <CardContent className="pt-4 space-y-4">
                         <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed text-sm">
@@ -143,13 +133,11 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
                         
                         <div className="pt-2 space-y-3">
                            <div className="flex items-center justify-between">
-                              <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Criterios de Evaluación</h4>
-                              {isDraft && (
-                                <div className="flex items-center">
-                                  <AddCEButton templateId={id} raId={ra.id} />
-                                  <BulkAddCEButton templateId={id} raId={ra.id} />
-                                </div>
-                              )}
+                               <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Criterios de Evaluación</h4>
+                               <div className="flex items-center">
+                                 <AddCEButton templateId={id} raId={ra.id} />
+                                 <BulkAddCEButton templateId={id} raId={ra.id} />
+                               </div>
                            </div>
                            
                            {ra.ces && ra.ces.length > 0 ? (
@@ -159,16 +147,11 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
                                        <div className="font-mono text-zinc-400 text-sm font-bold pt-0.5">{ce.code}</div>
                                        <div className="flex-1 space-y-1">
                                           <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{ce.description}</p>
-                                          <div className="text-[10px] uppercase font-bold text-zinc-400">
-                                            Peso en RA: {ce.weight_in_ra}%
-                                          </div>
                                        </div>
-                                       {isDraft && (
-                                         <div className="flex items-start gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                            <EditCEButton templateId={id} ce={ce} />
-                                            <DeleteCEButton templateId={id} ceId={ce.id} />
-                                         </div>
-                                       )}
+                                       <div className="flex items-start gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                          <EditCEButton templateId={id} ce={ce} />
+                                          <DeleteCEButton templateId={id} ceId={ce.id} />
+                                       </div>
                                     </div>
                                  ))}
                               </div>
@@ -183,7 +166,7 @@ export default async function TemplateDetailsPage({ params }: TemplatePageProps)
             ) : (
               <Card className="bg-zinc-50/50 border-dashed border-2 dark:bg-zinc-900/20 py-12 flex flex-col items-center justify-center border-zinc-200 dark:border-zinc-800">
                  <p className="text-zinc-500 mb-4 font-medium">Empieza añadiendo tu primer Resultado de Aprendizaje.</p>
-                 {isDraft && <AddRAButton templateId={id} />}
+                 <AddRAButton templateId={id} />
               </Card>
             )}
           </section>

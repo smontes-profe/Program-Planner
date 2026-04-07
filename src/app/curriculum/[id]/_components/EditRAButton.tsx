@@ -21,7 +21,6 @@ export function EditRAButton({ templateId, ra }: EditRAButtonProps) {
       const payload = {
         code: formData.get("code") as string,
         description: formData.get("description") as string,
-        weight: 0, // Hidden for now as per previous fix
       };
       
       const res = await updateRA(templateId, ra.id, payload);

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase";
-import { curriculumTemplateSchema, validateWeights } from "./schemas";
+import { curriculumTemplateSchema } from "./schemas";
 import { type CurriculumTemplate, type CurriculumStatus } from "./types";
 import { z } from "zod";
 
@@ -40,16 +40,15 @@ async function authorizeAction(supabase: any, action: 'read' | 'write', organiza
     return { authorized: false, error: "No tienes permisos en esta organización", user };
   }
 
-  // If write and teacher, check status or ownership
+  // If write and teacher, check ownership
   if (action === 'write' && membership.role_in_org === 'teacher' && templateId) {
     const { data: template } = await supabase
       .from("curriculum_templates")
-      .select("status, created_by_profile_id")
+      .select("created_by_profile_id")
       .eq("id", templateId)
       .single();
 
-    if (template?.status !== 'draft') return { authorized: false, error: "No se puede modificar un registro ya publicado.", user };
-    if (template?.created_by_profile_id !== user.id) return { authorized: false, error: "Acceso denegado: No eres el creador de este borrador.", user };
+    if (template?.created_by_profile_id !== user.id) return { authorized: false, error: "Acceso denegado: No eres el creador de este currículo.", user };
   }
 
   return { authorized: true, user };
@@ -79,9 +78,33 @@ export async function createTemplateDraftAction(prevState: any, formData: FormDa
 }
 
 /**
- * Add a Resultat d'Aprenentatge (RA) to a template
+ * Server Action for updating a template (Form Submission)
  */
-export async function addRA(templateId: string, payload: { code: string; description: string; weight: number }): Promise<ActionResponse<any>> {
+export async function updateTemplateDraftAction(
+  templateId: string,
+  prevState: any, 
+  formData: FormData
+): Promise<ActionResponse<CurriculumTemplate>> {
+  const rawData = Object.fromEntries(formData.entries());
+  
+  const validated = curriculumTemplateSchema.partial().safeParse(rawData);
+  if (!validated.success) {
+    return { 
+      ok: false, 
+      error: "Datos del formulario inválidos", 
+      details: validated.error.flatten().fieldErrors,
+      fields: rawData
+    };
+  }
+
+  const result = await updateTemplateDraft(templateId, validated.data);
+  if (!result.ok) {
+    return { ...result, fields: rawData };
+  }
+  return result;
+}
+
+export async function addRA(templateId: string, payload: { code: string; description: string }): Promise<ActionResponse<any>> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("template_ra")
@@ -89,7 +112,6 @@ export async function addRA(templateId: string, payload: { code: string; descrip
       template_id: templateId,
       code: payload.code,
       description: payload.description,
-      weight_in_template: payload.weight
     });
 
   if (error) return { ok: false, error: `Error al añadir RA: ${error.message}`, fields: payload };
@@ -100,7 +122,7 @@ export async function addRA(templateId: string, payload: { code: string; descrip
 /**
  * Add a Criteri d'Avaluació (CE) to an RA
  */
-export async function addCE(templateId: string, raId: string, payload: { code: string; description: string; weight: number }): Promise<ActionResponse<any>> {
+export async function addCE(templateId: string, raId: string, payload: { code: string; description: string }): Promise<ActionResponse<any>> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("template_ce")
@@ -108,7 +130,6 @@ export async function addCE(templateId: string, raId: string, payload: { code: s
       template_ra_id: raId,
       code: payload.code,
       description: payload.description,
-      weight_in_ra: payload.weight
     });
 
   if (error) return { ok: false, error: `Error al añadir CE: ${error.message}`, fields: payload };
@@ -119,14 +140,13 @@ export async function addCE(templateId: string, raId: string, payload: { code: s
 /**
  * Add multiple Criteris d'Avaluació (CE) to an RA
  */
-export async function addMultipleCE(templateId: string, raId: string, payloads: { code: string; description: string; weight: number }[]): Promise<ActionResponse<any>> {
+export async function addMultipleCE(templateId: string, raId: string, payloads: { code: string; description: string }[]): Promise<ActionResponse<any>> {
   const supabase = await createClient();
   
   const items = payloads.map(payload => ({
     template_ra_id: raId,
     code: payload.code,
     description: payload.description,
-    weight_in_ra: payload.weight
   }));
 
   const { error } = await supabase
@@ -155,7 +175,6 @@ export async function addMultipleRAWithCE(
         template_id: templateId,
         code: payload.code,
         description: payload.description,
-        weight_in_template: 0
       })
       .select("id")
       .single();
@@ -170,7 +189,6 @@ export async function addMultipleRAWithCE(
         template_ra_id: raData.id,
         code: ce.code,
         description: ce.description,
-        weight_in_ra: 0
       }));
 
       const { error: ceError } = await supabase.from("template_ce").insert(ceInserts);
@@ -210,32 +228,9 @@ async function updateTemplateStatus(id: string, status: CurriculumStatus): Promi
 }
 
 /**
- * Publish a template (requires weights to be valid)
+ * Publish a template
  */
 export async function publishTemplateAction(templateId: string): Promise<ActionResponse<any>> {
-  const supabase = await createClient();
-  
-  // Fetch full template with RA/CE for weight validation
-  const { data: fullTemplate, error: fetchError } = await supabase
-    .from("curriculum_templates")
-    .select(`
-      *,
-      ras:template_ra (
-        *,
-        ces:template_ce (*)
-      )
-    `)
-    .eq("id", templateId)
-    .single();
-
-  if (fetchError || !fullTemplate) return { ok: false, error: "Error al recuperar los datos de la plantilla para validación" };
-
-  // Weight validation
-  const validation = validateWeights(fullTemplate);
-  if (!validation.isValid) {
-    return { ok: false, error: "Validación de pesos fallida", details: validation.errors };
-  }
-
   return updateTemplateStatus(templateId, 'published');
 }
 
@@ -296,35 +291,22 @@ export async function updateTemplateDraft(id: string, payload: Partial<z.infer<t
 
 /**
  * Publish a Curriculum Template
- * Validates weights (RA sum = 100, CE sum per RA = 100)
  */
 export async function publishTemplate(id: string): Promise<ActionResponse<CurriculumTemplate>> {
   const supabase = await createClient();
   
-  // Fetch full template with RA/CE
-  const { data: fullTemplate, error: fetchError } = await supabase
+  // Fetch template basic info for auth
+  const { data: template, error: fetchError } = await supabase
     .from("curriculum_templates")
-    .select(`
-      *,
-      ras:template_ra (
-        *,
-        ces:template_ce (*)
-      )
-    `)
+    .select("organization_id")
     .eq("id", id)
     .single();
 
-  if (fetchError || !fullTemplate) return { ok: false, error: "Error al recuperar los datos de la plantilla" };
+  if (fetchError || !template) return { ok: false, error: "Error al recuperar los datos de la plantilla" };
 
   // Authorization check
-  const { authorized, error } = await authorizeAction(supabase, 'write', fullTemplate.organization_id, id);
+  const { authorized, error } = await authorizeAction(supabase, 'write', template.organization_id, id);
   if (!authorized) return { ok: false, error: error || "Sin autorización" };
-
-  // Weight validation
-  const validation = validateWeights(fullTemplate);
-  if (!validation.isValid) {
-    return { ok: false, error: "Validación de pesos fallida", details: validation.errors };
-  }
 
   // Update status to published
   const { data: updated, error: dbError } = await supabase
@@ -342,17 +324,24 @@ export async function publishTemplate(id: string): Promise<ActionResponse<Curric
 }
 
 /**
- * Delete a draft template
+ * Delete a template
  */
-export async function deleteTemplateDraft(id: string): Promise<ActionResponse> {
+export async function deleteTemplate(id: string): Promise<ActionResponse> {
   const supabase = await createClient();
-  const { data: template } = await supabase.from("curriculum_templates").select("organization_id, status").eq("id", id).single();
+  const { data: template } = await supabase.from("curriculum_templates").select("organization_id").eq("id", id).single();
   if (!template) return { ok: false, error: "Plantilla no encontrada" };
-
-  if (template.status !== 'draft') return { ok: false, error: "No se puede eliminar un registro ya publicado." };
 
   const { authorized, error } = await authorizeAction(supabase, 'write', template.organization_id, id);
   if (!authorized) return { ok: false, error: error || "Sin autorización" };
+
+  // Check if any plan is directly using this template
+  const { count, error: countError } = await supabase
+    .from("teaching_plans")
+    .select("*", { count: "exact", head: true })
+    .eq("source_template_id", id);
+
+  if (countError) return { ok: false, error: "Error al verificar dependencias del currículo" };
+  if (count && count > 0) return { ok: false, error: "No se puede eliminar: Hay programaciones vinculadas directamente a este currículo." };
 
   const { error: dbError } = await supabase.from("curriculum_templates").delete().eq("id", id);
   if (dbError) return { ok: false, error: `Error en la base de datos: ${dbError.message}` };
@@ -382,14 +371,13 @@ export async function listTemplates(): Promise<ActionResponse<CurriculumTemplate
 /**
  * Update an existing RA
  */
-export async function updateRA(templateId: string, raId: string, payload: { code: string; description: string; weight: number }): Promise<ActionResponse<any>> {
+export async function updateRA(templateId: string, raId: string, payload: { code: string; description: string }): Promise<ActionResponse<any>> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("template_ra")
     .update({
       code: payload.code,
       description: payload.description,
-      weight_in_template: payload.weight
     })
     .eq("id", raId)
     .eq("template_id", templateId);
@@ -418,14 +406,13 @@ export async function deleteRA(templateId: string, raId: string): Promise<Action
 /**
  * Update an existing CE
  */
-export async function updateCE(templateId: string, ceId: string, payload: { code: string; description: string; weight: number }): Promise<ActionResponse<any>> {
+export async function updateCE(templateId: string, ceId: string, payload: { code: string; description: string }): Promise<ActionResponse<any>> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("template_ce")
     .update({
       code: payload.code,
       description: payload.description,
-      weight_in_ra: payload.weight
     })
     .eq("id", ceId);
 

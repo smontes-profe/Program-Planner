@@ -20,7 +20,6 @@ export function AddRAButton({ templateId }: AddRAButtonProps) {
       const payload = {
         code: formData.get("code") as string,
         description: formData.get("description") as string,
-        weight: 0,
       };
       
       const res = await addRA(templateId, payload);
