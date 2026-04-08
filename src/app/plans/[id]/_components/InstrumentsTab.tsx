@@ -138,7 +138,9 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
             onValueChange={(v) => { if (v) setFormData({ ...formData, type: v as InstrumentType }) }}
           >
             <SelectTrigger id="inst-type">
-              <SelectValue />
+              <SelectValue>
+                {getInstrumentTypeLabel(formData.type)}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {INSTRUMENT_TYPES.map(t => (
