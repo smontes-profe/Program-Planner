@@ -450,8 +450,10 @@ export function CurriculumTab({ plan }: { readonly plan: TeachingPlanFull }) {
   const [ras, setRas] = useState(plan.ras || []);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     setRas(plan.ras || []);
   }, [plan.ras]);
 
@@ -500,7 +502,11 @@ export function CurriculumTab({ plan }: { readonly plan: TeachingPlanFull }) {
         </div>
       )}
 
-      {ras.length > 0 ? (
+      {!isMounted ? (
+        <div className="h-64 flex items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50">
+          <Loader2 className="h-8 w-8 animate-spin text-zinc-300" />
+        </div>
+      ) : ras.length > 0 ? (
         <DndContext 
           sensors={sensors} 
           collisionDetection={closestCenter} 

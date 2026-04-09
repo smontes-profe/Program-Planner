@@ -15,6 +15,7 @@ export interface TeachingPlan {
   visibility_scope: VisibilityScope;
   status: PlanStatus;
   hours_total: number;
+  ce_weight_auto: boolean;
   imported_at: string | null;
   created_at: string;
 }
@@ -69,6 +70,13 @@ export interface PlanInstrumentCE {
   weight: number;
 }
 
+/** RA coverage entry for an instrument: what % of the RA this instrument covers */
+export interface PlanInstrumentRA {
+  instrument_id: string;
+  plan_ra_id: string;
+  coverage_percent: number;
+}
+
 export interface PlanInstrument {
   id: string;
   plan_id: string;
@@ -81,6 +89,7 @@ export interface PlanInstrument {
   // Relations
   unit_ids?: string[]; // IDs of units this instrument belongs to
   ra_ids?: string[]; // IDs of RAs this instrument evaluates
+  ra_coverages?: PlanInstrumentRA[]; // RA coverage with percentages
   ce_weights?: PlanInstrumentCE[]; // Weights for CEs
 }
 
