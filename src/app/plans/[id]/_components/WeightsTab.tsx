@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, Fragment } from "react";
 import { type TeachingPlanFull, type PlanRA } from "@/domain/teaching-plan/types";
-import { updatePlanRAConfig } from "@/domain/teaching-plan/actions";
+import { updatePlanRAConfig, toggleCeWeightAuto, updateCeWeightsForRA } from "@/domain/teaching-plan/actions";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ChevronDown, ChevronRight, Loader2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WeightsTabProps {
@@ -145,6 +145,192 @@ function GlobalTotal({ total }: { readonly total: number }) {
   );
 }
 
+// ─── CE Weight editor for automation ─────────────────────────────────────────
+function CeWeightRow({ planId, ra, autoEnabled }: {
+  readonly planId: string;
+  readonly ra: PlanRA;
+  readonly autoEnabled: boolean;
+}) {
+  const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
+  const [localWeights, setLocalWeights] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const ce of ra.ces || []) {
+      initial[ce.id] = String(Number(ce.weight_in_ra) || 0);
+    }
+    return initial;
+  });
+
+  const ces = ra.ces || [];
+  if (ces.length === 0) return null;
+
+  const totalCeWeight = Object.values(localWeights).reduce((sum, v) => sum + (Number.parseFloat(v) || 0), 0);
+  const isValid = Math.abs(totalCeWeight - 100) < 0.1;
+
+  async function handleSave() {
+    setIsPending(true);
+    setError("");
+    const ceWeights = ces.map(ce => ({
+      ceId: ce.id,
+      weightInRa: Number.parseFloat(localWeights[ce.id] || "0") || 0
+    }));
+
+    const res = await updateCeWeightsForRA(planId, ra.id, ceWeights);
+    setIsPending(false);
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setError(res.error);
+    }
+  }
+
+  if (!autoEnabled) return null;
+
+  return (
+    <tr>
+      <td colSpan={5} className="px-4 pb-3">
+        <div className="ml-4 border-l-2 border-emerald-200 dark:border-emerald-800 pl-4">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 transition-colors mb-1"
+          >
+            {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            Pesos de CEs ({ces.length} criterios)
+            {isValid && <CheckCircle2 className="h-3 w-3 ml-1 text-emerald-500" />}
+            {!isValid && totalCeWeight > 0 && <AlertTriangle className="h-3 w-3 ml-1 text-amber-500" />}
+          </button>
+
+          {expanded && (
+            <div className="space-y-2 mt-2">
+              {ces.map(ce => (
+                <div key={ce.id} className="flex items-center gap-3">
+                  <span className="text-[11px] font-mono font-bold text-zinc-500 w-6">{ce.code})</span>
+                  <span className="text-[11px] text-zinc-600 dark:text-zinc-400 flex-1 truncate">
+                    {ce.description}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={localWeights[ce.id] || ""}
+                      onChange={(e) => setLocalWeights(prev => ({ ...prev, [ce.id]: e.target.value }))}
+                      className={cn(
+                        "w-16 h-7 rounded border px-2 text-right text-xs font-mono",
+                        "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900",
+                        "focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      )}
+                      placeholder="0"
+                    />
+                    <span className="text-[10px] text-zinc-400">%</span>
+                  </div>
+                </div>
+              ))}
+
+              {/* Total + Save */}
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <div className={cn(
+                  "text-xs font-bold",
+                  isValid ? "text-emerald-600" : totalCeWeight > 0 ? "text-amber-600" : "text-zinc-400"
+                )}>
+                  Total: {totalCeWeight.toFixed(2)}%
+                  {isValid && " ✓"}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isPending || !isValid}
+                  className={cn(
+                    "text-xs px-3 py-1 rounded-md font-medium transition-colors",
+                    isValid
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      : "bg-zinc-100 text-zinc-400 cursor-not-allowed"
+                  )}
+                >
+                  {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar pesos"}
+                </button>
+              </div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Automation Toggle ───────────────────────────────────────────────────────
+function AutomationToggle({ planId, enabled }: { readonly planId: string; readonly enabled: boolean }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function handleToggle() {
+    startTransition(async () => {
+      await toggleCeWeightAuto(planId, !enabled);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className={cn(
+      "flex items-center justify-between gap-4 p-4 rounded-xl border transition-colors",
+      enabled
+        ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20"
+        : "border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/30"
+    )}>
+      <div className="flex items-start gap-3">
+        <div className={cn(
+          "p-2 rounded-lg",
+          enabled ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-zinc-100 dark:bg-zinc-800"
+        )}>
+          <Zap className={cn(
+            "h-5 w-5",
+            enabled ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400"
+          )} />
+        </div>
+        <div>
+          <h4 className={cn(
+            "text-sm font-semibold",
+            enabled ? "text-emerald-900 dark:text-emerald-300" : "text-zinc-700 dark:text-zinc-300"
+          )}>
+            Automatizar pesos de CEs
+          </h4>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed max-w-xl">
+            Cuando está activado, defines una vez el reparto de pesos de cada CE dentro de su RA.
+            Los instrumentos que cubran ese RA heredarán automáticamente esos porcentajes.
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={isPending}
+        role="switch"
+        aria-checked={enabled}
+        aria-label="Automatizar pesos de CEs"
+        className={cn(
+          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
+          "transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2",
+          enabled ? "bg-emerald-600" : "bg-zinc-200 dark:bg-zinc-700",
+          isPending && "opacity-50"
+        )}
+      >
+        <span
+          className={cn(
+            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out",
+            enabled ? "translate-x-5" : "translate-x-0"
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function WeightsTab({ plan }: WeightsTabProps) {
   const ras = plan.ras ?? [];
@@ -169,6 +355,9 @@ export function WeightsTab({ plan }: WeightsTabProps) {
         </p>
       </div>
 
+      {/* Automation toggle */}
+      <AutomationToggle planId={plan.id} enabled={plan.ce_weight_auto} />
+
       <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
         <table className="w-full text-sm">
           <thead>
@@ -191,29 +380,37 @@ export function WeightsTab({ plan }: WeightsTabProps) {
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {ras.map((ra) => (
-              <tr key={ra.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-mono font-bold text-zinc-400 text-xs shrink-0">RA {ra.code}</span>
-                    <span className="text-zinc-700 dark:text-zinc-300 text-xs leading-snug line-clamp-2">
-                      {ra.description}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <GlobalWeightInput planId={plan.id} ra={ra} />
-                </td>
-                {TRIMESTERS.map((t) => (
-                  <td key={t.key} className="px-4 py-3 text-center">
-                    <TrimesterCell
-                      planId={plan.id}
-                      ra={ra}
-                      trimester={t.key}
-                      computedWeight={computeTrimesterWeight(ras, ra.id, t.key)}
-                    />
+              <Fragment key={ra.id}>
+                <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono font-bold text-zinc-400 text-xs shrink-0">RA {ra.code}</span>
+                      <span className="text-zinc-700 dark:text-zinc-300 text-xs leading-snug line-clamp-2">
+                        {ra.description}
+                      </span>
+                    </div>
                   </td>
-                ))}
-              </tr>
+                  <td className="px-4 py-3">
+                    <GlobalWeightInput planId={plan.id} ra={ra} />
+                  </td>
+                  {TRIMESTERS.map((t) => (
+                    <td key={t.key} className="px-4 py-3 text-center">
+                      <TrimesterCell
+                        planId={plan.id}
+                        ra={ra}
+                        trimester={t.key}
+                        computedWeight={computeTrimesterWeight(ras, ra.id, t.key)}
+                      />
+                    </td>
+                  ))}
+                </tr>
+                {/* CE weight sub-rows when automation is enabled */}
+                <CeWeightRow
+                  planId={plan.id}
+                  ra={ra}
+                  autoEnabled={plan.ce_weight_auto}
+                />
+              </Fragment>
             ))}
           </tbody>
           <tfoot>

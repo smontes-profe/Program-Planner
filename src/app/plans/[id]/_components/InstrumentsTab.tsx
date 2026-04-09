@@ -15,7 +15,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit2, Trash2, Loader2, Calculator } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, Calculator, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider 
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface InstrumentsTabProps {
   readonly plan: TeachingPlanFull;
@@ -43,11 +44,16 @@ function getInstrumentTypeLabel(type: string) {
   return INSTRUMENT_TYPES.find(t => t.value === type)?.label || type;
 }
 
-// ─── Instrument Form Component ──────────────────────────────
+// ─── Instrument Form Component ──────────────────────────────────
 function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, error }: {
   readonly plan: TeachingPlanFull,
   readonly initialData?: PlanInstrument,
-  readonly onSubmit: (payload: any, unitIds: string[], raIds: string[], ceWeights: { ceId: string; weight: number }[]) => void,
+  readonly onSubmit: (
+    payload: any,
+    unitIds: string[],
+    raCoverages: { raId: string; coveragePercent: number }[],
+    ceWeights: { ceId: string; weight: number }[]
+  ) => void,
   readonly onCancel: () => void,
   readonly isPending: boolean,
   readonly error: string
@@ -63,10 +69,24 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
     new Set(initialData?.unit_ids || [])
   );
 
-  const [selectedRas, setSelectedRas] = useState<Set<string>>(
-    new Set(initialData?.ra_ids || [])
-  );
+  // RA coverage: raId -> coveragePercent
+  const [raCoverages, setRaCoverages] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    for (const rc of initialData?.ra_coverages || []) {
+      initial[rc.plan_ra_id] = Number(rc.coverage_percent) || 0;
+    }
+    // Also handle legacy ra_ids without coverage
+    for (const raId of initialData?.ra_ids || []) {
+      if (!(raId in initial)) {
+        initial[raId] = 0;
+      }
+    }
+    return initial;
+  });
 
+  const selectedRas = new Set(Object.keys(raCoverages));
+
+  // CE weights: ceId -> weight (percentage within the RA)
   const [ceWeights, setCeWeights] = useState<Record<string, number>>(
     (initialData?.ce_weights || []).reduce((acc, cw) => ({
       ...acc,
@@ -74,16 +94,45 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
     }), {})
   );
 
+  const ceWeightAutoEnabled = plan.ce_weight_auto;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const weightsArray = Object.entries(ceWeights)
-      .filter(([ceId, weight]) => {
-        const ce = plan.ras.flatMap(ra => ra.ces || []).find(c => c.id === ceId);
-        return ce && selectedRas.has(ce.plan_ra_id) && weight > 0;
-      })
-      .map(([ceId, weight]) => ({ ceId, weight }));
 
-    onSubmit(formData, Array.from(selectedUnits), Array.from(selectedRas), weightsArray);
+    // Build RA coverages array
+    const raCoveragesArray = Object.entries(raCoverages)
+      .filter(([, percent]) => percent >= 0)
+      .map(([raId, coveragePercent]) => ({ raId, coveragePercent }));
+
+    // Build CE weights array
+    let weightsArray: { ceId: string; weight: number }[];
+
+    if (ceWeightAutoEnabled) {
+      // When automation is ON, compute CE weights from RA coverage × CE weight_in_ra
+      weightsArray = [];
+      for (const { raId, coveragePercent } of raCoveragesArray) {
+        const ra = plan.ras.find(r => r.id === raId);
+        if (!ra?.ces) continue;
+        for (const ce of ra.ces) {
+          const ceShareNormalized = (Number(ce.weight_in_ra) || 0) / 100;
+          const derivedWeight = coveragePercent * ceShareNormalized;
+          if (derivedWeight > 0) {
+            weightsArray.push({ ceId: ce.id, weight: Number(derivedWeight.toFixed(4)) });
+          }
+        }
+      }
+    } else {
+      // Manual mode: use the weights the user entered
+      weightsArray = Object.entries(ceWeights)
+        .filter(([ceId]) => {
+          const ce = plan.ras.flatMap(ra => ra.ces || []).find(c => c.id === ceId);
+          return ce && selectedRas.has(ce.plan_ra_id);
+        })
+        .filter(([, weight]) => weight > 0)
+        .map(([ceId, weight]) => ({ ceId, weight }));
+    }
+
+    onSubmit(formData, Array.from(selectedUnits), raCoveragesArray, weightsArray);
   };
 
   const toggleUnit = (uId: string) => {
@@ -94,15 +143,47 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
   };
 
   const toggleRA = (raId: string) => {
-    const next = new Set(selectedRas);
-    if (next.has(raId)) next.delete(raId);
-    else next.add(raId);
-    setSelectedRas(next);
+    const next = { ...raCoverages };
+    if (raId in next) {
+      delete next[raId];
+      // Also clear CE weights for this RA's CEs
+      const ra = plan.ras.find(r => r.id === raId);
+      if (ra?.ces) {
+        const newCeWeights = { ...ceWeights };
+        for (const ce of ra.ces) {
+          delete newCeWeights[ce.id];
+        }
+        setCeWeights(newCeWeights);
+      }
+    } else {
+      next[raId] = 0;
+    }
+    setRaCoverages(next);
   };
 
-  const handleWeightChange = (ceId: string, value: string) => {
+  const handleRaCoverageChange = (raId: string, value: string) => {
+    const num = Number.parseFloat(value) || 0;
+    setRaCoverages(prev => ({ ...prev, [raId]: Math.min(100, Math.max(0, num)) }));
+  };
+
+  const handleCeWeightChange = (ceId: string, value: string) => {
     const num = Number.parseFloat(value) || 0;
     setCeWeights(prev => ({ ...prev, [ceId]: num }));
+  };
+
+  // Helper: compute the CE sum for a given RA
+  const getCeWeightSum = (raId: string): number => {
+    const ra = plan.ras.find(r => r.id === raId);
+    if (!ra?.ces) return 0;
+    return ra.ces.reduce((sum, ce) => sum + (ceWeights[ce.id] || 0), 0);
+  };
+
+  // Helper: check if automation weights are valid for a given RA
+  const isAutoWeightsValid = (raId: string): boolean => {
+    const ra = plan.ras.find(r => r.id === raId);
+    if (!ra?.ces || ra.ces.length === 0) return false;
+    const total = ra.ces.reduce((sum, ce) => sum + (Number(ce.weight_in_ra) || 0), 0);
+    return Math.abs(total - 100) < 0.1;
   };
 
   return (
@@ -184,22 +265,43 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
         </div>
       </div>
 
-      {/* RA Selection */}
+      {/* RA Selection + Coverage Percent */}
       <div className="space-y-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
         <h4 className="text-sm font-semibold flex items-center gap-2">
           Resultados de Aprendizaje vinculados
         </h4>
+        <p className="text-[10px] text-zinc-500 mb-2">
+          Marca los RAs que evalúa este instrumento e indica qué porcentaje de la nota del RA aporta.
+        </p>
         <div className="grid grid-cols-1 gap-2 mt-2">
           {plan.ras.map(ra => (
-            <div key={ra.id} className="flex items-center space-x-2 rounded-md border border-zinc-100 dark:border-zinc-900 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-              <Checkbox 
-                id={`ra-${ra.id}`} 
-                checked={selectedRas.has(ra.id)}
-                onCheckedChange={() => toggleRA(ra.id)}
-              />
-              <Label htmlFor={`ra-${ra.id}`} className="text-xs font-medium cursor-pointer flex-1">
-                RA {ra.code} - {ra.description}
-              </Label>
+            <div key={ra.id} className="rounded-md border border-zinc-100 dark:border-zinc-900 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Checkbox 
+                  id={`ra-${ra.id}`} 
+                  checked={selectedRas.has(ra.id)}
+                  onCheckedChange={() => toggleRA(ra.id)}
+                />
+                <Label htmlFor={`ra-${ra.id}`} className="text-xs font-medium cursor-pointer flex-1">
+                  RA {ra.code} - {ra.description}
+                </Label>
+                {selectedRas.has(ra.id) && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Input 
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      className="h-7 w-16 text-right text-xs font-mono"
+                      value={raCoverages[ra.id] ?? ""}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleRaCoverageChange(ra.id, e.target.value)}
+                      placeholder="0"
+                      aria-label={`Porcentaje de cobertura del RA ${ra.code}`}
+                    />
+                    <span className="text-[10px] text-zinc-400">%</span>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -210,44 +312,126 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
         <div className="space-y-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
           <h4 className="text-sm font-semibold flex items-center gap-2">
             Pesos sobre Criterios de Evaluación (%)
+            {ceWeightAutoEnabled && (
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <Zap className="h-3 w-3" /> Automatizado
+              </Badge>
+            )}
           </h4>
-          <p className="text-[10px] text-zinc-500 mb-4">
-            Indica qué porcentaje de la nota del instrumento aporta a cada CE.
-          </p>
+          {ceWeightAutoEnabled ? (
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mb-4">
+              Los pesos de CE están definidos en la pestaña de Pesos y se aplican automáticamente.
+              El porcentaje efectivo de cada CE = (% del RA) × (% del CE dentro del RA).
+            </p>
+          ) : (
+            <p className="text-[10px] text-zinc-500 mb-4">
+              Indica qué porcentaje de la nota del instrumento aporta a cada CE.
+              Los porcentajes de CEs dentro de cada RA deben sumar 100%.
+            </p>
+          )}
           
           <div className="space-y-6">
-            {plan.ras.filter(ra => selectedRas.has(ra.id)).map(ra => (
-              <div key={ra.id} className="space-y-2">
-                <div className="flex items-center gap-2 border-b border-zinc-100 pb-1">
-                  <Badge variant="neutral" className="text-[10px] font-bold border-zinc-200">RA {ra.code}</Badge>
-                  <span className="text-[11px] text-zinc-500 truncate">{ra.description}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-3 ml-2">
-                  {ra.ces?.map(ce => (
-                    <div key={ce.id} className="flex items-center gap-3">
-                      <Label htmlFor={`ce-${ce.id}`} className="text-[11px] font-mono leading-tight flex-1">
-                        <span className="font-bold mr-1">{ce.code})</span>
-                        <span className="text-zinc-600 dark:text-zinc-400 font-normal">{ce.description}</span>
-                      </Label>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Input 
-                          id={`ce-${ce.id}`}
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          className="h-8 w-16 text-right text-xs"
-                          value={ceWeights[ce.id] || ""}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleWeightChange(ce.id, e.target.value)}
-                          placeholder="0"
-                        />
-                        <span className="text-[10px] text-zinc-400">%</span>
+            {plan.ras.filter(ra => selectedRas.has(ra.id)).map(ra => {
+              const raPercent = raCoverages[ra.id] || 0;
+              const autoValid = isAutoWeightsValid(ra.id);
+              const manualSum = getCeWeightSum(ra.id);
+              const manualValid = Math.abs(manualSum - 100) < 0.1;
+
+              return (
+                <div key={ra.id} className="space-y-2">
+                  <div className="flex items-center gap-2 border-b border-zinc-100 pb-1">
+                    <Badge variant="neutral" className="text-[10px] font-bold border-zinc-200">RA {ra.code}</Badge>
+                    <span className="text-[11px] text-zinc-500 truncate">{ra.description}</span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-600 ml-auto shrink-0">
+                      {raPercent}% del RA
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 ml-2">
+                    {ra.ces?.map(ce => {
+                      const autoWeight = Number(ce.weight_in_ra) || 0;
+                      const effectivePercent = ceWeightAutoEnabled
+                        ? Number(((raPercent * autoWeight) / 100).toFixed(4))
+                        : 0;
+
+                      return (
+                        <div key={ce.id} className="flex items-center gap-3">
+                          <Label htmlFor={`ce-${ce.id}`} className="text-[11px] font-mono leading-tight flex-1">
+                            <span className="font-bold mr-1">{ce.code})</span>
+                            <span className="text-zinc-600 dark:text-zinc-400 font-normal">{ce.description}</span>
+                          </Label>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {ceWeightAutoEnabled ? (
+                              // Automated: show derived value, disabled
+                              <div className="flex items-center gap-1">
+                                <Input 
+                                  id={`ce-${ce.id}`}
+                                  type="number"
+                                  className="h-8 w-16 text-right text-xs bg-zinc-50 dark:bg-zinc-800 cursor-not-allowed opacity-60"
+                                  value={autoWeight}
+                                  disabled
+                                  aria-label={`Peso automatizado del CE ${ce.code}`}
+                                />
+                                <span className="text-[10px] text-zinc-400">%</span>
+                                {autoValid && (
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <span className="text-[9px] text-emerald-500 font-mono ml-1">
+                                        ={effectivePercent.toFixed(2)}%
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {raPercent}% (RA) × {autoWeight}% (CE) = {effectivePercent.toFixed(2)}% del RA
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            ) : (
+                              // Manual: editable input
+                              <>
+                                <Input 
+                                  id={`ce-${ce.id}`}
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  className="h-8 w-16 text-right text-xs"
+                                  value={ceWeights[ce.id] || ""}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCeWeightChange(ce.id, e.target.value)}
+                                  placeholder="0"
+                                />
+                                <span className="text-[10px] text-zinc-400">%</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Validation feedback per RA */}
+                  {ceWeightAutoEnabled ? (
+                    !autoValid && (
+                      <p className="text-[10px] text-amber-600 ml-2">
+                        ⚠ Los pesos de CE para este RA no suman 100% en la pestaña de Pesos.
+                        Configúralos allí para que la automatización funcione.
+                      </p>
+                    )
+                  ) : (
+                    ra.ces && ra.ces.length > 0 && (
+                      <div className="ml-2 flex items-center gap-2">
+                        <span className={cn(
+                          "text-[10px] font-mono font-bold",
+                          manualValid ? "text-emerald-600" : manualSum > 0 ? "text-amber-600" : "text-zinc-400"
+                        )}>
+                          Suma: {manualSum.toFixed(2)}%
+                          {manualValid ? " ✓" : manualSum > 0 ? " (debe ser 100%)" : ""}
+                        </span>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -277,15 +461,20 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(payload: any, unitIds: string[], raIds: string[], ceWeights: { ceId: string; weight: number }[]) {
+  async function handleSubmit(
+    payload: any,
+    unitIds: string[],
+    raCoverages: { raId: string; coveragePercent: number }[],
+    ceWeights: { ceId: string; weight: number }[]
+  ) {
     setIsPending(true);
     setError("");
     
     let res;
     if (editingInstrument) {
-      res = await updatePlanInstrument(plan.id, editingInstrument.id, payload, unitIds, raIds, ceWeights);
+      res = await updatePlanInstrument(plan.id, editingInstrument.id, payload, unitIds, raCoverages, ceWeights);
     } else {
-      res = await addPlanInstrument(plan.id, payload, unitIds, raIds, ceWeights);
+      res = await addPlanInstrument(plan.id, payload, unitIds, raCoverages, ceWeights);
     }
 
     setIsPending(false);
@@ -358,7 +547,7 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
                 <TableHead>Instrumento</TableHead>
                 <TableHead className="w-[110px]">Tipo</TableHead>
                 <TableHead className="w-[120px]">UTs</TableHead>
-                <TableHead className="w-[120px]">RAs</TableHead>
+                <TableHead className="w-[160px]">RAs (cobertura)</TableHead>
                 <TableHead>CEs</TableHead>
                 <TableHead className="text-right w-[100px]">Acciones</TableHead>
               </TableRow>
@@ -376,11 +565,19 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
                     return plan.units?.find(u => u.id === uId)?.code || "?";
                   });
 
-                  // We need to find the RA code and description for tooltips
-                  const ras = (inst.ra_ids || []).map(raId => {
-                    const ra = plan.ras.find(r => r.id === raId);
-                    return ra ? { code: ra.code, description: ra.description } : null;
+                  // RA info with coverage percent
+                  const rasWithCoverage = (inst.ra_coverages || []).map(rc => {
+                    const ra = plan.ras.find(r => r.id === rc.plan_ra_id);
+                    return ra ? { code: ra.code, description: ra.description, coverage: rc.coverage_percent } : null;
                   }).filter(Boolean);
+
+                  // Fallback: legacy ra_ids without coverage data
+                  if (rasWithCoverage.length === 0 && inst.ra_ids?.length) {
+                    for (const raId of inst.ra_ids) {
+                      const ra = plan.ras.find(r => r.id === raId);
+                      if (ra) rasWithCoverage.push({ code: ra.code, description: ra.description, coverage: 0 });
+                    }
+                  }
 
                   // Filtered weights and their associated CEs
                   const ces = (inst.ce_weights || []).map(cw => {
@@ -415,12 +612,24 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {ras.map(ra => (
+                          {rasWithCoverage.map(ra => (
                             <Tooltip key={ra!.code}>
                               <TooltipTrigger className="cursor-help">
-                                <Badge variant="neutral" className="bg-zinc-100 text-[10px] py-0 hover:bg-zinc-200">RA {ra!.code}</Badge>
+                                <Badge variant="neutral" className="bg-zinc-100 text-[10px] py-0 hover:bg-zinc-200 gap-0.5">
+                                  RA {ra!.code}
+                                  {ra!.coverage > 0 && (
+                                    <span className="text-emerald-600 font-bold ml-0.5">{ra!.coverage}%</span>
+                                  )}
+                                </Badge>
                               </TooltipTrigger>
-                              <TooltipContent>{ra!.description}</TooltipContent>
+                              <TooltipContent>
+                                <div className="space-y-1">
+                                  <p className="font-bold">{ra!.description}</p>
+                                  {ra!.coverage > 0 && (
+                                    <p className="text-emerald-400">Cobertura: {ra!.coverage}% de la nota del RA</p>
+                                  )}
+                                </div>
+                              </TooltipContent>
                             </Tooltip>
                           ))}
                         </div>
@@ -469,7 +678,8 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
           <div>
             <h4 className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">Resumen de Cobertura</h4>
             <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70 mt-1 leading-relaxed">
-              Una vez definidos los instrumentos y sus pesos, podrás ver en la pestaña de <strong>Pesos</strong> si has cubierto correctamente el 100% de cada Criterio de Evaluación.
+              Cada instrumento especifica qué porcentaje de la nota de cada RA cubre.
+              Los pesos de los CEs {plan.ce_weight_auto ? "se calculan automáticamente desde la pestaña de Pesos" : "se asignan manualmente por instrumento"}.
             </p>
           </div>
         </div>

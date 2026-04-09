@@ -18,6 +18,9 @@ import {
 import { Plus, Edit2, Trash2, Loader2, Clock, GripVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  Tooltip, TooltipTrigger, TooltipContent, TooltipProvider 
+} from "@/components/ui/tooltip";
 import { PlanHoursEditor } from "./PlanHoursEditor";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +59,8 @@ function SortableUTRow({ unit, plan, index, sortedUnits }: {
   index: number;
   sortedUnits: PlanTeachingUnit[];
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const {
     attributes,
     listeners,
@@ -73,35 +78,128 @@ function SortableUTRow({ unit, plan, index, sortedUnits }: {
     backgroundColor: isDragging ? "var(--zinc-100)" : undefined,
   };
 
-  const trimesters = [];
-  if (unit.active_t1) trimesters.push("1");
-  if (unit.active_t2) trimesters.push("2");
-  if (unit.active_t3) trimesters.push("3");
-  const trimestersStr = trimesters.join(", ") || "-";
+  function handleHoursChange(newHours: number) {
+    if (newHours === unit.hours) return;
+    startTransition(async () => {
+      const res = await updatePlanUnit(plan.id, unit.id, { hours: newHours });
+      if (!res.ok) alert(res.error);
+      router.refresh();
+    });
+  }
 
-  const raCodes = (unit.ra_ids || []).map(rId => {
-    return plan.ras.find(r => r.id === rId)?.code || "?";
-  });
-  const raStr = raCodes.length > 0 ? raCodes.map(c => `RA${c}`).join(", ") : "-";
+  function toggleTrimester(t: 1 | 2 | 3) {
+    const key = `active_t${t}` as "active_t1" | "active_t2" | "active_t3";
+    const newValue = !unit[key];
+    
+    // Validate at least one trimester
+    const t1 = t === 1 ? newValue : unit.active_t1;
+    const t2 = t === 2 ? newValue : unit.active_t2;
+    const t3 = t === 3 ? newValue : unit.active_t3;
+    
+    if (!t1 && !t2 && !t3) {
+      alert("La unidad debe pertenecer al menos a un trimestre.");
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await updatePlanUnit(plan.id, unit.id, { 
+        active_t1: t1, 
+        active_t2: t2, 
+        active_t3: t3 
+      });
+      if (!res.ok) alert(res.error);
+      router.refresh();
+    });
+  }
+
+  const rasWithData = (unit.ra_ids || []).map(rId => {
+    return plan.ras.find(r => r.id === rId);
+  }).filter(Boolean);
 
   return (
-    <TableRow ref={setNodeRef} style={style} className={cn("group", isDragging && "shadow-md")}>
+    <TableRow 
+      ref={setNodeRef} 
+      style={style} 
+      className={cn(
+        "group relative", 
+        isDragging && "shadow-md",
+        isPending && "bg-zinc-50/50 dark:bg-zinc-900/40"
+      )}
+    >
       <TableCell className="w-[40px]">
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors text-zinc-300 hover:text-zinc-500">
           <GripVertical className="h-4 w-4" />
         </div>
       </TableCell>
       <TableCell className="font-medium min-w-[200px]">
-        <span className="text-zinc-900 dark:text-zinc-100">{unit.code} - {unit.title}</span>
+        <div className="flex flex-col">
+          <span className="text-zinc-900 dark:text-zinc-100 font-semibold">{unit.code}</span>
+          <span className="text-zinc-500 dark:text-zinc-400 text-xs truncate max-w-[250px]">{unit.title}</span>
+        </div>
       </TableCell>
-      <TableCell className="text-center font-mono text-sm text-zinc-600 dark:text-zinc-400">
-        {unit.hours}
+      <TableCell className="text-center w-[100px]">
+        <div className="flex items-center justify-center gap-1 group/input">
+          <input
+            type="number"
+            min={0}
+            defaultValue={unit.hours}
+            onBlur={(e) => handleHoursChange(Number(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleHoursChange(Number((e.target as HTMLInputElement).value));
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            disabled={isPending}
+            className={cn(
+              "w-12 h-8 text-center text-sm font-mono font-bold rounded-md border border-transparent",
+              "bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-200 dark:focus:border-zinc-700",
+              "transition-all focus:outline-none focus:ring-1 focus:ring-emerald-500",
+              isPending && "opacity-50"
+            )}
+          />
+          {isPending && <Loader2 className="h-3 w-3 animate-spin text-emerald-600 absolute right-4" />}
+        </div>
       </TableCell>
-      <TableCell className="text-center text-zinc-600 dark:text-zinc-400">
-        {trimestersStr}
+      <TableCell className="text-center w-[120px]">
+        <div className="flex items-center justify-center gap-1">
+          {[1, 2, 3].map((t) => {
+            const key = `active_t${t}` as "active_t1" | "active_t2" | "active_t3";
+            const active = unit[key];
+            return (
+              <button
+                key={t}
+                onClick={() => toggleTrimester(t as 1 | 2 | 3)}
+                disabled={isPending}
+                className={cn(
+                  "w-7 h-7 rounded-md text-[10px] font-bold transition-all border",
+                  active 
+                    ? "bg-emerald-600 border-emerald-600 text-white shadow-sm" 
+                    : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:border-zinc-400"
+                )}
+              >
+                T{t}
+              </button>
+            )
+          })}
+        </div>
       </TableCell>
       <TableCell className="text-zinc-600 dark:text-zinc-400 text-sm">
-        {raStr}
+        <div className="flex flex-wrap gap-1">
+          {rasWithData.map(ra => (
+            <Tooltip key={ra!.id}>
+              <TooltipTrigger>
+                <div className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:text-zinc-400 cursor-help hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                  RA{ra!.code}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs z-[9999] shadow-xl border border-zinc-200 dark:border-zinc-800">
+                <p className="text-xs">{ra!.description}</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+          {unit.ra_ids?.length === 0 && <span className="text-zinc-300">-</span>}
+        </div>
       </TableCell>
       <TableCell className="text-right text-zinc-400">
         <UTItemActions plan={plan} unit={unit} />
@@ -336,8 +434,10 @@ function UTItemActions({ plan, unit }: { readonly plan: TeachingPlanFull; readon
 export function UnitsTab({ plan }: { readonly plan: TeachingPlanFull }) {
   const [units, setUnits] = useState(plan.units || []);
   const [isPending, startTransition] = useTransition();
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     setUnits(plan.units || []);
   }, [plan.units]);
 
@@ -361,111 +461,120 @@ export function UnitsTab({ plan }: { readonly plan: TeachingPlanFull }) {
   }
 
   const totalHoursUsed = calculateTotalHours(units);
-  const targetHours = plan.hours_total || plan.sourceTemplateHours || 0;
+  const targetHours = plan.hours_total || 0;
   const hoursMatch = totalHoursUsed === targetHours;
   const percentage = Math.min(100, (totalHoursUsed / (targetHours || 1)) * 100);
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-            Unidades de Trabajo (UT)
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Planificación temporal y contenidos del módulo.
-          </p>
+    <TooltipProvider>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+              Unidades de Trabajo (UT)
+            </h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Planificación temporal y contenidos del módulo.
+            </p>
+          </div>
+          <AddUTButton plan={plan} />
         </div>
-        <AddUTButton plan={plan} />
-      </div>
 
-      <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-950 shadow-sm relative">
-        {isPending && (
-          <div className="absolute inset-0 bg-white/20 dark:bg-black/20 z-10 pointer-events-none flex items-center justify-center">
-             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-4 py-2 shadow-lg flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
-                <span className="text-xs font-medium">Actualizando orden UT...</span>
-             </div>
+        {!isMounted ? (
+          <div className="h-32 flex items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50">
+            <Loader2 className="h-6 w-6 animate-spin text-zinc-300" />
           </div>
-        )}
-        <Table>
-          <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
-            <TableRow>
-              <TableHead className="w-[40px]"></TableHead>
-              <TableHead>Unidad de Trabajo</TableHead>
-              <TableHead className="text-center w-[80px]">Horas</TableHead>
-              <TableHead className="text-center w-[100px]">Trimestre</TableHead>
-              <TableHead>RAs Cubiertos</TableHead>
-              <TableHead className="text-right w-[100px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {units.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-zinc-500 italic">
-                  No hay unidades de trabajo definidas.
-                </TableCell>
-              </TableRow>
-            ) : (
-              <DndContext 
-                sensors={sensors} 
-                collisionDetection={closestCenter} 
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext items={units.map(u => u.id)} strategy={verticalListSortingStrategy}>
-                  {units.map((unit, index) => (
-                    <SortableUTRow 
-                      key={unit.id} 
-                      unit={unit} 
-                      plan={plan} 
-                      index={index} 
-                      sortedUnits={units} 
-                    />
-                  ))}
-                </SortableContext>
-              </DndContext>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Hours Progress (Footer) */}
-      <div className="bg-zinc-50 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 p-4 rounded-xl mt-4">
-        <div className="flex justify-between items-end mb-3">
-          <div className="flex items-center gap-2 pb-1">
-            <Clock className="h-5 w-5 text-zinc-400" />
-            <span className="font-medium text-sm text-zinc-700 dark:text-zinc-300">Total Horas Planificadas</span>
-          </div>
-          <div className="text-right">
-            <div className={`text-2xl font-bold ${hoursMatch ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"}`}>
-              {totalHoursUsed}
+        ) : (
+          <DndContext 
+            sensors={sensors} 
+            collisionDetection={closestCenter} 
+            onDragEnd={handleDragEnd}
+          >
+            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-950 shadow-sm relative">
+              {isPending && (
+                <div className="absolute inset-0 bg-white/20 dark:bg-black/20 z-10 pointer-events-none flex items-center justify-center">
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-4 py-2 shadow-lg flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                      <span className="text-xs font-medium">Actualizando orden UT...</span>
+                  </div>
+                </div>
+              )}
+              <Table>
+                <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                  <TableRow>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead>Unidad de Trabajo</TableHead>
+                    <TableHead className="text-center w-[100px]">Horas</TableHead>
+                    <TableHead className="text-center w-[120px]">Trimestre</TableHead>
+                    <TableHead>RAs Cubiertos</TableHead>
+                    <TableHead className="text-right w-[100px]">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {units.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-32 text-center text-zinc-500 italic">
+                        No hay unidades de trabajo definidas.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <SortableContext items={units.map(u => u.id)} strategy={verticalListSortingStrategy}>
+                      {units.map((unit, index) => (
+                        <SortableUTRow 
+                          key={unit.id} 
+                          unit={unit} 
+                          plan={plan} 
+                          index={index} 
+                          sortedUnits={units} 
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-            <div className="flex items-center justify-end gap-1.5 mt-0.5">
-              <span className="text-zinc-400 text-[10px] uppercase font-bold tracking-tight">Objetivo del módulo:</span>
+          </DndContext>
+        )}
+
+        {/* Hours Progress (Footer) */}
+        <div className="bg-zinc-50 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 p-4 rounded-xl mt-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-zinc-400" />
+              <span className="font-medium text-sm text-zinc-700 dark:text-zinc-300">Total Horas Planificadas</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className={cn(
+                "text-xl font-bold tracking-tight",
+                hoursMatch ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"
+              )}>
+                {totalHoursUsed}
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-600 text-xl font-light">/</span>
               <PlanHoursEditor planId={plan.id} initialHours={targetHours} />
             </div>
           </div>
-        </div>
 
-        <div className="h-2.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all duration-500 ${
-              totalHoursUsed > targetHours ? "bg-red-500" :
-              hoursMatch ? "bg-emerald-500" : "bg-blue-500"
-            }`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
+          <div className="h-2.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ${
+                totalHoursUsed > targetHours ? "bg-red-500" :
+                hoursMatch ? "bg-emerald-500" : "bg-blue-500"
+              }`}
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
 
-        {!hoursMatch && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-3 flex items-center gap-1.5 leading-none">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-            {totalHoursUsed < targetHours 
-              ? `Faltan ${targetHours - totalHoursUsed}h para completar el objetivo.` 
-              : `Has superado el objetivo en ${totalHoursUsed - targetHours}h.`}
-          </p>
-        )}
+          {!hoursMatch && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-3 flex items-center gap-1.5 leading-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              {totalHoursUsed < targetHours 
+                ? `Faltan ${targetHours - totalHoursUsed}h para completar el objetivo.` 
+                : `Has superado el objetivo en ${totalHoursUsed - targetHours}h.`}
+            </p>
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

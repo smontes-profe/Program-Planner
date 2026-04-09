@@ -52,7 +52,7 @@ export async function getPlan(planId: string): Promise<ActionResponse<TeachingPl
       instruments:plan_instrument (
         *,
         units_coverage:plan_instrument_unit (unit_id),
-        ras_coverage:plan_instrument_ra (plan_ra_id),
+        ras_coverage:plan_instrument_ra (plan_ra_id, coverage_percent),
         ce_weights:plan_instrument_ce (*)
       )
     `)
@@ -84,6 +84,11 @@ export async function getPlan(planId: string): Promise<ActionResponse<TeachingPl
     ...i,
     unit_ids: i.units_coverage?.map((uc: any) => uc.unit_id) || [],
     ra_ids: i.ras_coverage?.map((rc: any) => rc.plan_ra_id) || [],
+    ra_coverages: (i.ras_coverage || []).map((rc: any) => ({
+      instrument_id: i.id,
+      plan_ra_id: rc.plan_ra_id,
+      coverage_percent: Number(rc.coverage_percent) || 0
+    })),
     ce_weights: i.ce_weights || []
   }));
 
@@ -605,7 +610,7 @@ export async function addPlanInstrument(
   planId: string,
   payload: { code: string; type: string; name: string; description?: string | null },
   unitIds: string[] = [],
-  raIds: string[] = [],
+  raCoverages: { raId: string; coveragePercent: number }[] = [],
   ceWeights: { ceId: string; weight: number }[] = []
 ): Promise<ActionResponse<any>> {
   const validated = planInstrumentSchema.safeParse(payload);
@@ -640,11 +645,12 @@ export async function addPlanInstrument(
     if (ulError) return { ok: false, error: `Error al enlazar unidades: ${ulError.message}` };
   }
 
-  // 2b. Link RAs
-  if (raIds.length > 0) {
-    const raLinks = raIds.map(raId => ({
+  // 2b. Link RAs with coverage_percent
+  if (raCoverages.length > 0) {
+    const raLinks = raCoverages.map(rc => ({
       instrument_id: instrument.id,
-      plan_ra_id: raId
+      plan_ra_id: rc.raId,
+      coverage_percent: rc.coveragePercent
     }));
     const { error: rlError } = await supabase.from("plan_instrument_ra").insert(raLinks);
     if (rlError) return { ok: false, error: `Error al enlazar RAs: ${rlError.message}` };
@@ -670,7 +676,7 @@ export async function updatePlanInstrument(
   instrumentId: string,
   payload: { code?: string; type?: string; name?: string; description?: string | null },
   unitIds?: string[],
-  raIds?: string[],
+  raCoverages?: { raId: string; coveragePercent: number }[],
   ceWeights?: { ceId: string; weight: number }[]
 ): Promise<ActionResponse<any>> {
   const supabase = await createClient();
@@ -702,11 +708,15 @@ export async function updatePlanInstrument(
     }
   }
 
-  // 2b. Update RA links (sync)
-  if (raIds !== undefined) {
+  // 2b. Update RA links with coverage_percent (sync)
+  if (raCoverages !== undefined) {
     await supabase.from("plan_instrument_ra").delete().eq("instrument_id", instrumentId);
-    if (raIds.length > 0) {
-      const raLinks = raIds.map(raId => ({ instrument_id: instrumentId, plan_ra_id: raId }));
+    if (raCoverages.length > 0) {
+      const raLinks = raCoverages.map(rc => ({
+        instrument_id: instrumentId,
+        plan_ra_id: rc.raId,
+        coverage_percent: rc.coveragePercent
+      }));
       const { error: rlError } = await supabase.from("plan_instrument_ra").insert(raLinks);
       if (rlError) return { ok: false, error: `Error al actualizar RAs: ${rlError.message}` };
     }
@@ -735,6 +745,60 @@ export async function deletePlanInstrument(planId: string, instrumentId: string)
   const { error } = await supabase.from("plan_instrument").delete().eq("id", instrumentId).eq("plan_id", planId);
   
   if (error) return { ok: false, error: `Error al eliminar instrumento: ${error.message}` };
+  revalidatePath(`/plans/${planId}`);
+  return { ok: true, data: null };
+}
+
+// ─────────────────────────────────────────────
+// CE WEIGHT AUTOMATION
+// ─────────────────────────────────────────────
+
+/**
+ * Toggle the ce_weight_auto flag on a teaching plan
+ */
+export async function toggleCeWeightAuto(
+  planId: string,
+  enabled: boolean
+): Promise<ActionResponse<null>> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("teaching_plans")
+    .update({ ce_weight_auto: enabled })
+    .eq("id", planId);
+
+  if (error) return { ok: false, error: `Error al cambiar automatización: ${error.message}` };
+  revalidatePath(`/plans/${planId}`);
+  return { ok: true, data: null };
+}
+
+/**
+ * Bulk-update the weight_in_ra for all CEs of a given RA
+ * Expects ceWeights to cover ALL CEs and sum to 100.
+ */
+export async function updateCeWeightsForRA(
+  planId: string,
+  raId: string,
+  ceWeights: { ceId: string; weightInRa: number }[]
+): Promise<ActionResponse<null>> {
+  // Validate sum = 100
+  const total = ceWeights.reduce((sum, cw) => sum + cw.weightInRa, 0);
+  if (Math.abs(total - 100) > 0.1) {
+    return { ok: false, error: `La suma de pesos de los CEs debe ser 100% (actual: ${total.toFixed(2)}%)` };
+  }
+
+  const supabase = await createClient();
+
+  // Update each CE weight
+  for (const cw of ceWeights) {
+    const { error } = await supabase
+      .from("plan_ce")
+      .update({ weight_in_ra: cw.weightInRa })
+      .eq("id", cw.ceId)
+      .eq("plan_ra_id", raId);
+
+    if (error) return { ok: false, error: `Error al actualizar peso de CE: ${error.message}` };
+  }
+
   revalidatePath(`/plans/${planId}`);
   return { ok: true, data: null };
 }

@@ -90,14 +90,14 @@ Status legend:
 
 ### Phase 3B - Unidades de Trabajo e Instrumentos
 
-- [ ] Implement `plan_teaching_unit` schema with trimester assignment and hours field.
-- [ ] Implement `plan_unit_ra` coverage table (which RAs a UT covers).
+- [x] Implement `plan_teaching_unit` schema with trimester assignment and hours field.
+- [x] Implement `plan_unit_ra` coverage table (which RAs a UT covers).
 - [x] `/plans/[id]` tab: Unidades de Trabajo (CRUD + RA/CE assignment per UT).
 - [x] Implement `evaluation_instruments` schema linked to a UT (Already done in migration).
 - [x] Implement `instrument_ce_weight` (which CEs an instrument covers and with what %) (Already done in migration).
 - [x] `/plans/[id]` tab: Instrumentos (CRUD + CE weight assignment per instrument).
-- [ ] Añadir en la edición de instrumentos la entrada de porcentaje por RA cubierta y exigir que los porcentajes de CE dentro de cada RA sumen 100 % para poder derivar la aportación a cada CE.
-- [ ] Añadir la opción “Automatizar pesos de CEs” en el tab de Pesos: permitir fijar la distribución por CE dentro de cada RA, validar que suma 100 % y que los instrumentos hereden esos pesos cuando está activada.
+- [x] Añadir en la edición de instrumentos la entrada de porcentaje por RA cubierta y exigir que los porcentajes de CE dentro de cada RA sumen 100 % para poder derivar la aportación a cada CE.
+- [x] Añadir la opción “Automatizar pesos de CEs” en el tab de Pesos: permitir fijar la distribución por CE dentro de cada RA, validar que suma 100 % y que los instrumentos hereden esos pesos cuando está activada.
 - [ ] Computed weights panel: target vs. real comparison per RA (global + per trimester).
 
 ### Phase 3.5 - Teaching Plan Fixes and UX Improvements
