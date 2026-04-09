@@ -189,14 +189,24 @@ Business rules:
 
 - `EvaluationInstrument` belongs to a teaching plan.
 - Instrument types include `exam`, `project`, `activity`, `form`, `teacher_notebook`, `custom`.
-- Instrument coverage is modeled per CE (`coverage_percent`).
-- Grade input supports:
-  - `simple` mode: one grade replicated to all linked CE.
-  - `advanced` mode: grade per CE.
+  - Instrument coverage is modeled per CE (`coverage_percent`).
+  - Grade input supports:
+    - `simple` mode: one grade replicated to all linked CE.
+    - `advanced` mode: grade per CE.
+
+### 4.4.1 Instrument RA/CE coverage anatomy
+
+Each instrument defines both the set of RAs it touches and, for each RA, the percent of that RA’s grade that the instrument occupies. Within each RA, the instrument also records a CE-level share percentage so we can resolve how the instrument score flows from RA → CE. The CE share percentages for a given RA must sum to `100`; they represent the distribution of the instrument’s RA contribution across the RA’s criteria. When graders enter scores on an instrument, the `coverage_percent` stored for each CE is computed as the RA percentage multiplied by the CE share (both normalized) so that, for example, an instrument covering RA1 at `20%` with CE shares `a=20%`, `b=30%`, `c=50%` yields CE coverage of `4%`, `6%`, and `10%` of RA1, respectively. This explicit instrumentation makes it possible to trace any instrument grade back to the RA and CE(s) it supports.
 
 ## 5. Weight and Consistency Rules
 
 All percentages are stored in `[0, 100]` decimal format.
+
+### 5.1 Instrument RA coverage and automated CE weight distributions
+
+Each evaluation instrument now records two layers of percentages: the share of each RA that it covers, and the share of each RA’s grade that is distributed among its CEs. The CE share percentages for a given RA must sum to `100`, because they describe how the instrument’s RA coverage is split across the CE’s within that RA. The RA percentage (for example, `20%` on RA1) represents how much of RA1 the instrument is responsible for, and the CE shares split that `20%` among the related criteria (for example, CE `a` gets `20%` of that `20%`, CE `b` gets `30%`, CE `c` gets `50%`, resulting in 4%, 6% and 10% of the RA, respectively).
+
+A new “Automatizar pesos de CEs” option in the Pesos tab allows teachers to define a single RA → CE distribution per RA. When this option is enabled and every RA’s CE percentages sum to `100`, instrument editing no longer exposes manual CE share inputs for those RAs: instruments inherit their RAs’ CE distributions, and the CE coverage is computed automatically whenever an instrument is saved or graded. The Pesos editor should mirror the rest of the UI by letting teachers expand each RA to see its CEs and type the CE percentage to 2 decimals. This automation keeps per-instrument forms lean while ensuring consistent CE weights across all instruments that touch the same RA. If the automation is disabled or the CE percentages for an RA don’t pass validation, instruments must require manual CE share input per RA again.
 
 Hard invariants:
 
@@ -219,7 +229,8 @@ Rounding policy:
 
 ### 6.1 Formula Definitions
 
-- `ce_grade = sum(instrument_grade_for_ce * instrument_coverage_for_ce_normalized)`
+- `instrument_ce_coverage_factor = instrument_ra_percent_normalized * ce_share_percent_normalized`
+- `ce_grade = sum(instrument_grade_for_ce * instrument_ce_coverage_factor)`
 - `ra_grade = sum(ce_grade * ce_weight_in_ra_normalized)`
 - `final_grade = sum(ra_grade * ra_weight_in_plan_normalized)`
 
