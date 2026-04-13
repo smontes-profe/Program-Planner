@@ -1,6 +1,7 @@
 # Program Planner - System Architecture
 
 ## 1. Architectural Style
+
 - Framework: Next.js App Router (server-first).
 - Backend pattern: Server Actions + Supabase client.
 - Data store: PostgreSQL (Supabase) with strict relational integrity.
@@ -8,16 +9,18 @@
 - Security strategy: database-enforced authorization, app checks as secondary layer.
 
 ## 2. Logical Modules
+
 - `auth`: sign-up/sign-in/session management.
 - `organization`: organization and membership management.
 - `curriculum`: versioned curriculum templates by region/module/year.
 - `teaching-plan`: teacher-owned planning graph.
-- `evaluation`: instrument coverage and grade engine.
+- `evaluation`: evaluation contexts, student management, instrument grade entry, and grade computation engine. Includes CSV import/export of students and grades.
 - `collaboration`: import/fork and lineage.
 - `admin`: cross-organization moderation and support.
 - `ui-system`: design tokens, responsive layout primitives, accessibility patterns.
 
 ## 3. Context Diagram
+
 ```mermaid
 flowchart LR
     Teacher[Teacher] --> App[Program Planner Web App]
@@ -31,6 +34,7 @@ flowchart LR
 ```
 
 ## 4. Data Model (ERD)
+
 ```mermaid
 erDiagram
     PROFILE ||--o{ ORGANIZATION_MEMBERSHIP : has
@@ -46,8 +50,9 @@ erDiagram
     TEACHING_PLAN ||--o{ PLAN_RA : contains
     PLAN_RA ||--o{ PLAN_CE : contains
 
-    TEACHING_PLAN ||--o{ DIDACTIC_UNIT : includes
-    DIDACTIC_UNIT }o--o{ PLAN_CE : covers
+    TEACHING_PLAN ||--o{ TEACHING_UNIT : includes
+    TEACHING_UNIT }o--o{ PLAN_RA : covers
+    TEACHING_UNIT ||--o{ PLAN_INSTRUMENT : evaluated_by
 
     TEACHING_PLAN ||--o{ EVALUATION_INSTRUMENT : defines
     EVALUATION_INSTRUMENT ||--o{ INSTRUMENT_CE_WEIGHT : maps
@@ -96,6 +101,7 @@ erDiagram
         string version
         string status "draft|published|deprecated"
         string source_type "manual|pdf_assisted"
+        int hours_total
         timestamptz created_at
     }
 
@@ -104,7 +110,6 @@ erDiagram
         uuid template_id FK
         string code
         text description
-        numeric weight_in_template
     }
 
     TEMPLATE_CE {
@@ -112,7 +117,6 @@ erDiagram
         uuid template_ra_id FK
         string code
         text description
-        numeric weight_in_ra
     }
 
     TEACHING_PLAN {
@@ -127,7 +131,7 @@ erDiagram
         string module_code
         string academic_year
         string visibility_scope "private|organization|company"
-        string status "draft|ready|published|archived"
+        string status "draft|published"
         timestamptz imported_at
         timestamptz created_at
     }
@@ -137,7 +141,10 @@ erDiagram
         uuid plan_id FK
         string code
         text description
-        numeric weight_in_plan
+        numeric weight_global
+        boolean active_t1
+        boolean active_t2
+        boolean active_t3
     }
 
     PLAN_CE {
@@ -148,14 +155,45 @@ erDiagram
         numeric weight_in_ra
     }
 
-    DIDACTIC_UNIT {
+    TEACHING_UNIT {
         uuid id PK
         uuid plan_id FK
         string code
         string title
-        text description
         string trimester "T1|T2|T3"
-        int display_order
+        int hours
+        int order_index
+    }
+
+    PLAN_INSTRUMENT {
+        uuid id PK
+        uuid plan_id FK
+        string type "exam|practice|project|oral|other"
+        string name
+        text description
+        timestamptz created_at
+    }
+
+    PLAN_INSTRUMENT_CE {
+        uuid instrument_id FK
+        uuid plan_ce_id FK
+        numeric weight
+    }
+
+    PLAN_UNIT_RA {
+        uuid unit_id FK
+        uuid plan_ra_id FK
+    }
+
+    PLAN_INSTRUMENT_UNIT {
+        uuid instrument_id FK
+        uuid unit_id FK
+    }
+
+    INSTRUMENT_RA_COVERAGE {
+        uuid instrument_id FK
+        uuid plan_ra_id FK
+        numeric coverage_percent
     }
 
     EVALUATION_INSTRUMENT {
@@ -186,14 +224,17 @@ erDiagram
 ```
 
 ## 5. Authorization and RLS Strategy
+
 RLS is mandatory and default-deny.
 
 Access model:
+
 - `platform_admin`: unrestricted access.
 - `org_manager`: full access inside owned organization.
 - `teacher`: own plans write access + shared read/import based on `visibility_scope`.
 
 Visibility rules:
+
 - `private`: owner, org managers in same organization, platform admins.
 - `organization`: any active membership in same organization.
 - `company`: any authenticated active member in any organization.
@@ -201,6 +242,7 @@ Visibility rules:
 ## 6. Key Flows
 
 ### 6.1 Import Template to Teaching Plan
+
 ```mermaid
 sequenceDiagram
     actor U as Teacher
@@ -219,6 +261,7 @@ sequenceDiagram
 ```
 
 ### 6.2 Save Grade and Recompute
+
 ```mermaid
 sequenceDiagram
     actor U as Teacher
@@ -236,12 +279,20 @@ sequenceDiagram
     SA-->>UI: Updated metrics
 ```
 
+### 6.3 Configure CE weight automation and instrument coverage
+
+1. Teacher opens the `Pesos` tab, flips the “Automatizar pesos de CEs” switch, and can expand each RA to see its CE list and enter the percentage share (validated to sum 100%). The system marks those RA → CE distributions as canonical for the plan.
+2. When editing an instrument, the UI now pairs each selected RA with a coverage percent input and exposes the CE share fields only if automation is off or the RA’s CE shares are invalidated. If automation is active and valid, the CE share inputs are disabled and the derived values are shown for transparency.
+3. Saving the instrument persists `INSTRUMENT_RA_COVERAGE` rows (RA coverage percent) plus `INSTRUMENT_CE_WEIGHT` rows whose `coverage_percent` is computed as `RA coverage × CE share`. Grade entry workflows read the same `INSTRUMENT_CE_WEIGHT` rows, so automated CE weights automatically apply to all instruments that touch the RA.
+
 ## 7. Versioning and Immutability
+
 - Template unique key: `organization_id + region_code + module_code + academic_year + version`.
-- `published` templates are immutable.
-- Any functional update requires new version row (for example `v2`).
+- `published` templates are mutable for corrections (e.g., matching BOJA updates).
+- Curriculum modifications do _not_ retroactively affect existing `teaching_plans` due to the Deep Copy architecture.
 
 ## 8. Deployment Topology
+
 - Vercel hosts Next.js app.
 - Supabase hosts Postgres/Auth/Storage.
 - GitHub Actions runs lint/typecheck/tests and optional migration checks.
@@ -250,6 +301,7 @@ sequenceDiagram
   - `main` -> production deployment
 
 ## 9. Frontend Interaction Architecture
+
 - Use a shared UI system based on Tailwind + shadcn primitives.
 - Keep semantic structure in page shells:
   - `header`
@@ -262,6 +314,7 @@ sequenceDiagram
   - mobile: simplified layout with prioritized actions
 
 ## 10. Critical Non-Functional Requirements
+
 - Deterministic and test-covered grade calculations.
 - Auditable lineage for all imports/forks.
 - Predictable performance for high-volume plans.
