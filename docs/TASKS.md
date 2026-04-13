@@ -34,19 +34,19 @@ Status legend:
 
 - [x] Validar que al menos un trimestre esté seleccionado al crear una UT. Actualmente lanza un error de base de datos (`at_least_one_trimester_chk`) en inglés. El error debe ser descriptivo, en castellano y preservar los datos del formulario.
 
-- [ ] Simplificar estados de programación a `draft` y `published` (eliminar `ready` y `archived` del MVP):
-  - [ ] Actualizar constraint DB de `status` a solo `draft` | `published`.
-  - [ ] Actualizar tipo TypeScript `PlanStatus` y schema Zod.
-  - [ ] Server Action `publishPlan(planId)`: cambia `draft → published`. No requiere validación bloqueante de invariantes.
-  - [ ] Server Action `unpublishPlan(planId)`: cambia `published → draft`.
-  - [ ] Una programación `published` es visible y seleccionable desde el módulo de Evaluaciones.
-  - [ ] Una programación `published` se puede seguir editando sin cambiar su estado (los cambios de peso se recalculan sobre todas las notas existentes — ver nota de Opción B a futuro).
-  - [ ] Panel de avisos en la vista de programación que muestre:
+- [x] Simplificar estados de programación a `draft` y `published` (eliminar `ready` y `archived` del MVP):
+  - [x] Actualizar constraint DB de `status` a solo `draft` | `published`.
+  - [x] Actualizar tipo TypeScript `PlanStatus` y schema Zod.
+  - [x] Server Action `publishPlan(planId)`: cambia `draft → published`. No requiere validación bloqueante de invariantes.
+  - [x] Server Action `unpublishPlan(planId)`: cambia `published → draft`.
+  - [x] Una programación `published` es visible y seleccionable desde el módulo de Evaluaciones.
+  - [x] Una programación `published` se puede seguir editando sin cambiar su estado (los cambios de peso se recalculan sobre todas las notas existentes — ver nota de Opción B a futuro).
+  - [x] Panel de avisos en la vista de programación que muestre:
     - RAs cuyo `weight_global` no suma 100%.
     - Instrumentos sin pesos de RA definidos.
     - CE sin pesos definidos dentro de un RA.
-  - [ ] Botones de publicar/despublicar en la vista de detalle del plan.
-  - [ ] Actualizar badges de status en lista y detalle (solo `draft` = "Borrador", `published` = "Publicada").
+  - [x] Botones de publicar/despublicar en la vista de detalle del plan.
+  - [x] Actualizar badges de status en lista y detalle (solo `draft` = "Borrador", `published` = "Publicada").
 
 ## Phase 3.6 - Evaluaciones
 
