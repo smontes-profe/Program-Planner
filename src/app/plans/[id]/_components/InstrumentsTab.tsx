@@ -562,27 +562,28 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
               ) : (
                 plan.instruments?.map((inst) => {
                   const unitCodes = (inst.unit_ids || []).map(uId => {
-                    return plan.units?.find(u => u.id === uId)?.code || "?";
+                    const unit = plan.units?.find(u => u.id === uId);
+                    return { id: uId, code: unit?.code || "?" };
                   });
 
-                  // RA info with coverage percent
+                  // RA info with coverage percent — include RA id for unique key
                   const rasWithCoverage = (inst.ra_coverages || []).map(rc => {
                     const ra = plan.ras.find(r => r.id === rc.plan_ra_id);
-                    return ra ? { code: ra.code, description: ra.description, coverage: rc.coverage_percent } : null;
+                    return ra ? { id: ra.id, code: ra.code, description: ra.description, coverage: rc.coverage_percent } : null;
                   }).filter(Boolean);
 
                   // Fallback: legacy ra_ids without coverage data
                   if (rasWithCoverage.length === 0 && inst.ra_ids?.length) {
                     for (const raId of inst.ra_ids) {
                       const ra = plan.ras.find(r => r.id === raId);
-                      if (ra) rasWithCoverage.push({ code: ra.code, description: ra.description, coverage: 0 });
+                      if (ra) rasWithCoverage.push({ id: ra.id, code: ra.code, description: ra.description, coverage: 0 });
                     }
                   }
 
-                  // Filtered weights and their associated CEs
+                  // Filtered weights and their associated CEs — include CE id for unique key
                   const ces = (inst.ce_weights || []).map(cw => {
                     const ce = plan.ras.flatMap(r => r.ces || []).find(c => c.id === cw.plan_ce_id);
-                    return ce ? { code: ce.code, description: ce.description, weight: cw.weight } : null;
+                    return ce ? { id: ce.id, code: ce.code, description: ce.description, weight: cw.weight } : null;
                   }).filter(Boolean);
 
                   return (
@@ -605,15 +606,15 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {unitCodes.map(code => (
-                            <Badge key={code} variant="outline" className="text-[10px] py-0">{code}</Badge>
+                          {unitCodes.map(uc => (
+                            <Badge key={uc.id} variant="outline" className="text-[10px] py-0">{uc.code}</Badge>
                           ))}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {rasWithCoverage.map(ra => (
-                            <Tooltip key={ra!.code}>
+                            <Tooltip key={ra!.id}>
                               <TooltipTrigger className="cursor-help">
                                 <Badge variant="neutral" className="bg-zinc-100 text-[10px] py-0 hover:bg-zinc-200 gap-0.5">
                                   RA {ra!.code}
@@ -637,7 +638,7 @@ export function InstrumentsTab({ plan }: InstrumentsTabProps) {
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
                           {ces.map(ce => (
-                            <Tooltip key={ce!.code}>
+                            <Tooltip key={ce!.id}>
                               <TooltipTrigger className="cursor-help flex items-center gap-1 group">
                                 <span className="text-[11px] font-mono font-bold text-zinc-500 group-hover:text-primary transition-colors">{ce!.code})</span>
                                 <span className="text-[10px] text-zinc-400 font-medium">{ce!.weight}%</span>
