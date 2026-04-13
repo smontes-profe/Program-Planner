@@ -1,45 +1,21 @@
 # Vercel Deployment Setup
 
-## 1. Required GitHub Secrets
-Configure these repository secrets in GitHub:
+El despliegue en Vercel está configurado a través de la **integración nativa de la App de Vercel para GitHub**. Ya no se utilizan flujos de Github Actions secundarios para lanzar comandos por CLI.
 
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
+## 1. Comportamiento del despliegue (Workflow)
 
-Where to find each value:
+Vercel reacciona automáticamente a los eventos de GitHub:
 
-### 1.1 `VERCEL_TOKEN`
-- Vercel Dashboard -> account avatar -> `Settings` -> `Tokens`.
-- Create a new token and copy it.
+- **Push / Pull Request hacia `develop`**: Despliegue entorno *Preview* (Staging).
+- **Merge o Push directo a `main`**: Despliegue entorno *Production*.
 
-### 1.2 `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`
-Option A (recommended):
-1. Install Vercel CLI locally.
-2. Run `vercel link` in project root.
-3. Open `.vercel/project.json` and copy:
-   - `orgId` -> `VERCEL_ORG_ID`
-   - `projectId` -> `VERCEL_PROJECT_ID`
+### Criterios de calidad y Tests en Vercel
 
-Option B:
-- Vercel Dashboard -> Project Settings -> General / project metadata.
+Por defecto, la integración de Vercel solo ejecuta la compilación de la app (`npm run build`, que incluye linters y typechecks integrados de Next.js). **No** ejecuta los tests unitarios ni E2E de Playwright (para evitar timeouts por sobrecarga en la plataforma de Vercel). 
+El aseguramiento total de la calidad se garantiza obligando al equipo a usar  **Pull Requests** (donde sí se activa el `quality-gates.yml` de GitHub Actions antes de dejar integrar la rama).
 
-## 2. Workflow Behavior
-Workflow file: `.github/workflows/vercel-deploy.yml`
+## 2. Vercel Environment Variables
 
-Triggers:
-- push to `develop`
-- push to `main`
-
-Targets:
-- `develop` -> Vercel Preview deployment
-- `main` -> Vercel Production deployment
-
-Safety behavior:
-- If `package.json` does not exist yet: workflow skips deploy.
-- If required Vercel secrets are missing: workflow fails with explicit message.
-
-## 3. Vercel Environment Variables
 Set these in Vercel project settings (Preview and Production as needed):
 
 - `NEXT_PUBLIC_SUPABASE_URL`
@@ -48,10 +24,12 @@ Set these in Vercel project settings (Preview and Production as needed):
 - `SUPABASE_DB_DIRECT_URL` (if app server runtime uses direct DB access)
 
 Recommended:
+
 - Keep Production and Preview values separated.
 - Never expose service role keys as public client variables.
 
 ## 4. First Dry Run Checklist
+
 1. Add GitHub secrets.
 2. Ensure Vercel env vars are configured.
 3. Push a trivial commit to `develop`.

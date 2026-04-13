@@ -1,6 +1,7 @@
 # Program Planner - Additional Diagrams
 
 ## 1. Use Case Diagram (High Level)
+
 ```mermaid
 flowchart LR
     Teacher[Teacher]
@@ -29,6 +30,7 @@ flowchart LR
 ```
 
 ## 2. Domain Class Diagram (Conceptual)
+
 ```mermaid
 classDiagram
     class Organization {
@@ -68,7 +70,10 @@ classDiagram
     class LearningResult {
       +id: UUID
       +code: string
-      +weightInPlan: number
+      +weightGlobal: number
+      +activeT1: boolean
+      +activeT2: boolean
+      +activeT3: boolean
     }
 
     class EvaluationCriterion {
@@ -77,10 +82,11 @@ classDiagram
       +weightInRa: number
     }
 
-    class DidacticUnit {
+    class TeachingUnit {
       +id: UUID
       +code: string
       +trimester: Trimester
+      +hours: number
     }
 
     class EvaluationInstrument {
@@ -106,8 +112,8 @@ classDiagram
     Profile "1" --> "*" TeachingPlan : owns
     TeachingPlan "1" --> "*" LearningResult : contains
     LearningResult "1" --> "*" EvaluationCriterion : contains
-    TeachingPlan "1" --> "*" DidacticUnit : includes
-    DidacticUnit "*" --> "*" EvaluationCriterion : covers
+    TeachingPlan "1" --> "*" TeachingUnit : includes
+    TeachingUnit "*" --> "*" LearningResult : covers
     TeachingPlan "1" --> "*" EvaluationInstrument : defines
     EvaluationInstrument "1" --> "*" InstrumentCriterionWeight : maps
     EvaluationCriterion "1" --> "*" InstrumentCriterionWeight : weightedIn
@@ -118,6 +124,7 @@ classDiagram
 ```
 
 ## 3. Visibility Decision Diagram
+
 ```mermaid
 flowchart TD
     Start[Plan Read Access Request]
@@ -143,12 +150,14 @@ flowchart TD
 ```
 
 ## 4. Teaching Plan State Diagram
+
 ```mermaid
 stateDiagram-v2
     [*] --> Draft
-    Draft --> Ready: Hard invariants pass
-    Ready --> Published: Teacher publishes
-    Published --> Draft: Teacher edits and unpublishes
-    Published --> Archived: Owner, org manager, or platform admin archives
-    Archived --> [*]
+    Draft --> Published: Teacher publishes
+    Published --> Draft: Teacher unpublishes
+    Draft --> [*]
+    Published --> [*]
 ```
+
+> **Note:** In the MVP, teaching plans have only two states: `draft` and `published`. The `ready` and `archived` states are deferred to a future iteration. A `published` plan can be edited without reverting to `draft`; weight changes recalculate all existing grades. See TASKS.md Phase 3.7 for future "freeze grades per trimester" functionality.
