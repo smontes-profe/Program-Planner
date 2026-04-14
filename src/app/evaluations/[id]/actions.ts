@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { linkTeachingPlan, unlinkTeachingPlan, updateEvaluationContext } from "@/domain/evaluation/actions";
+import { linkTeachingPlan, updateEvaluationContext } from "@/domain/evaluation/actions";
 
 async function handleRedirect(contextId: string, error?: string) {
   revalidatePath(`/evaluations/${contextId}`);
@@ -35,19 +35,6 @@ export async function linkPlanAction(formData: FormData) {
   if (!contextId || !planId) return;
 
   const result = await linkTeachingPlan(contextId, planId);
-  if (!result.ok) {
-    await handleRedirect(contextId, result.error);
-  } else {
-    await handleRedirect(contextId);
-  }
-}
-
-export async function unlinkPlanAction(formData: FormData) {
-  const contextId = formData.get("context_id") as string | null;
-  const planId = formData.get("plan_id") as string | null;
-  if (!contextId || !planId) return;
-
-  const result = await unlinkTeachingPlan(contextId, planId);
   if (!result.ok) {
     await handleRedirect(contextId, result.error);
   } else {

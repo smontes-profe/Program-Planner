@@ -1,7 +1,10 @@
+"use client";
+
+import { FormEvent, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type EvaluationContextFull } from "@/domain/evaluation/types";
-import { linkPlanAction, unlinkPlanAction, updateContextAction } from "../actions";
+import { linkPlanAction, updateContextAction } from "../actions";
 
 interface ContextSettingsPanelProps {
   readonly context: EvaluationContextFull;
@@ -12,12 +15,33 @@ export function ContextSettingsPanel({ context, availablePlans }: ContextSetting
   const linkedPlanIds = new Set(context.plans.map((plan) => plan.id));
   const linkablePlans = availablePlans.filter((plan) => !linkedPlanIds.has(plan.id));
 
+  const handleLinkSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      const formData = new FormData(event.currentTarget);
+      const planId = formData.get("plan_id") as string | null;
+      if (!planId) {
+        event.preventDefault();
+        return;
+      }
+      const plan = availablePlans.find((p) => p.id === planId);
+      const message = plan
+        ? `Asignar ${plan.module_code} - ${plan.title} desvinculará automáticamente las programaciones anteriores. ¿Quieres continuar?`
+        : "Asignar esta programación desvinculará automáticamente las anteriores. ¿Quieres continuar?";
+      if (!confirm(message)) {
+        event.preventDefault();
+      }
+    },
+    [availablePlans]
+  );
+
   return (
     <section id="context-settings" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/40 p-6 mb-6 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Configuración del contexto</p>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">Puedes cambiar el nombre, el curso y las programaciones asociadas.</p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+            Puedes cambiar el nombre, el curso y las programaciones asociadas (solo se puede desvincular reemplazándola).
+          </p>
         </div>
       </div>
 
@@ -64,25 +88,28 @@ export function ContextSettingsPanel({ context, availablePlans }: ContextSetting
               </p>
             ) : (
               <div className="space-y-2">
-                {context.plans.map((plan) => (
-                  <div key={plan.id} className="flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-900/40 px-3 py-2">
-                    <div className="text-sm font-medium text-zinc-700 dark:text-zinc-100">
-                      {plan.module_code} - {plan.title}
+                {context.plans.map((plan) => {
+                  const needsTruncate = plan.title.length > 22;
+                  const label = needsTruncate ? `${plan.title.slice(0, 22)}…` : plan.title;
+                  return (
+                    <div
+                      key={plan.id}
+                      className="flex items-center rounded-md bg-zinc-50 dark:bg-zinc-900/40 px-3 py-2"
+                    >
+                      <span
+                        className="text-sm font-medium text-zinc-700 dark:text-zinc-100 truncate"
+                        title={plan.title}
+                      >
+                        {plan.module_code} - {label}
+                      </span>
                     </div>
-                    <form action={unlinkPlanAction}>
-                      <input type="hidden" name="context_id" value={context.id} />
-                      <input type="hidden" name="plan_id" value={plan.id} />
-                      <Button variant="ghost" size="sm" type="submit">
-                        Desvincular
-                      </Button>
-                    </form>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-          <form action={linkPlanAction} className="space-y-2">
+          <form action={linkPlanAction} className="space-y-2" onSubmit={handleLinkSubmit}>
             <input type="hidden" name="context_id" value={context.id} />
             <label htmlFor="link-plan" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
               Vincular nueva programación
