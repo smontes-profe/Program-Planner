@@ -12,7 +12,8 @@ export const metadata = {
   description: "Gestiona las evaluaciones de tus módulos y alumnos.",
 };
 
-export default async function EvaluationsPage() {
+export default async function EvaluationsPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
+  const params = await searchParams;
   const [contextsResult, plansResult] = await Promise.all([
     listEvaluationContexts(),
     listPublishedPlans(),
@@ -50,6 +51,16 @@ export default async function EvaluationsPage() {
         </div>
         <CreateContextButton publishedPlans={publishedPlans} />
       </div>
+
+      {params?.error && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/5 mb-6">
+          <CardContent className="py-4">
+            <p className="text-sm text-red-700 dark:text-red-400 font-medium">
+              Error al crear contexto: {decodeURIComponent(params.error)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {contexts.length === 0 ? (
         <Card className="bg-zinc-50/50 border-dashed border-2 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800">
@@ -152,18 +163,23 @@ function CreateContextButton({ publishedPlans }: { publishedPlans: { id: string;
     const academic_year = formData.get("academic_year") as string;
     const planId = formData.get("plan_id") as string;
 
-    if (!title || !academic_year) return;
+    if (!title || !academic_year) {
+      redirect(`/evaluations?error=faltan_campos`);
+    }
 
     const result = await createEvaluationContext({ title, academic_year });
 
-    if (result.ok && planId) {
+    if (!result.ok) {
+      const errMsg = encodeURIComponent(result.error);
+      redirect(`/evaluations?error=${errMsg}`);
+    }
+
+    if (planId) {
       await linkTeachingPlan(result.data.id, planId);
     }
 
-    if (result.ok) {
-      revalidatePath("/evaluations");
-      redirect(`/evaluations/${result.data.id}`);
-    }
+    revalidatePath("/evaluations");
+    redirect(`/evaluations/${result.data.id}`);
   }
 
   return (
