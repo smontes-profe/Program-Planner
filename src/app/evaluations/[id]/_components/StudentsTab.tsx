@@ -14,69 +14,75 @@ interface StudentsTabProps {
 }
 
 /** Parse Moodle-style CSV (comma-separated, quoted, with Spanish decimal commas) */
-function parseMoodleCSV(text: string): { student_name: string; last_name: string; student_code: string | null; student_email: string | null }[] {
-  // Normalize: strip BOM, Windows line endings
+function parseMoodleCSV(text: string): { student_name: string; last_name: string | null; student_code: string | null; student_email: string | null }[] {
+  const normalizeHeader = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .trim();
+
+  const parseRow = (row: string): string[] => {
+    const cols: string[] = [];
+    let inQuotes = false;
+    let current = "";
+    for (const ch of row) {
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (ch === "," && !inQuotes) {
+        cols.push(current.trim());
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    cols.push(current.trim());
+    return cols;
+  };
+
   const cleaned = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = cleaned.trim().split("\n").filter(l => l.trim());
   if (lines.length < 2) return [];
 
-  // Parse header to find column indices
-  const headerLine = lines[0];
-  const headers: string[] = [];
-  let inQuotes = false;
-  let current = "";
-  for (const ch of headerLine) {
-    if (ch === '"') { inQuotes = !inQuotes; continue; }
-    if (ch === "," && !inQuotes) { headers.push(current.trim()); current = ""; continue; }
-    current += ch;
-  }
-  if (current.trim()) headers.push(current.trim());
+  const header = parseRow(lines[0]);
+  const normalizedHeaders = header.map(normalizeHeader);
 
-  // Log for debugging
-  console.log("CSV headers:", headers);
+  const idxApellidos = normalizedHeaders.findIndex(h => h.includes("apellido"));
+  const idxNombre = normalizedHeaders.findIndex(
+    h => h.includes("nombre") && !h.includes("usuario") && !h.includes("user")
+  );
+  const idxCodigo = normalizedHeaders.findIndex(h => h.includes("id") && h.includes("estudiante"));
+  const idxEmail = normalizedHeaders.findIndex(
+    h => h.includes("usuario") || h.includes("email") || h.includes("correo")
+  );
 
-  // Match columns flexibly
-  const idxApellidos = headers.findIndex(h => h.toLowerCase().includes("apellido"));
-  const idxNombre = headers.findIndex(h => /^nombre$/i.test(h.trim()));
-  const idxCodigo = headers.findIndex(h => h.toLowerCase().includes("id de estudiante"));
-  const idxEmail = headers.findIndex(h => h.toLowerCase().includes("usuario"));
-
-  console.log("Indices:", { idxApellidos, idxNombre, idxCodigo, idxEmail });
-
-  function parseLine(line: string): string[] {
-    const cols: string[] = [];
-    let q = false;
-    let cur = "";
-    for (const ch of line) {
-      if (ch === '"') { q = !q; continue; }
-      if (ch === "," && !q) { cols.push(cur.trim()); cur = ""; continue; }
-      cur += ch;
-    }
-    if (cur.trim()) cols.push(cur.trim());
-    return cols;
-  }
-
-  const results: { student_name: string; last_name: string; student_code: string | null; student_email: string | null }[] = [];
+  const results: { student_name: string; last_name: string | null; student_code: string | null; student_email: string | null }[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const cols = parseLine(lines[i]);
+    const cols = parseRow(lines[i]);
+    const getValue = (idx: number) => (idx >= 0 ? cols[idx] ?? "" : "");
 
-    const apellidos = idxApellidos >= 0 ? (cols[idxApellidos] || "") : "";
-    const nombre = idxNombre >= 0 ? (cols[idxNombre] || "") : "";
-    const code = idxCodigo >= 0 ? cols[idxCodigo] : null;
-    const email = idxEmail >= 0 ? cols[idxEmail] : null;
+    const apellidos = getValue(idxApellidos);
+    const nombre = getValue(idxNombre);
+    const codigo = getValue(idxCodigo);
+    const email = getValue(idxEmail);
 
-    // Filter out rows with empty code (like preview users)
-    if (!code || code === "") continue;
+    if (!nombre && !apellidos) continue;
+
+    const studentCode = codigo ? codigo : null;
+    if (!studentCode) continue; // Ignore preview rows without ID
+
+    const studentName = nombre || apellidos || "";
 
     results.push({
-      student_name: nombre || "",
-      last_name: apellidos || "",
-      student_code: code,
-      student_email: email || null,
+      student_name: studentName,
+      last_name: apellidos ? apellidos : null,
+      student_code: studentCode,
+      student_email: email ? email : null,
     });
   }
 
-  console.log("Parsed students:", results.length);
   return results;
 }
 

@@ -286,6 +286,8 @@ export async function bulkImportStudents(
   const rows = students.map(s => ({
     context_id: contextId,
     student_name: s.student_name,
+    last_name: s.last_name || null,
+    student_code: s.student_code || null,
     student_email: s.student_email || null,
   }));
 

@@ -30,6 +30,7 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
 - [x] CRUD completo de alumnos (crear, editar, eliminar).
 - [x] Importación masiva de alumnado desde CSV (columnas mínimas: nombre, email opcional).
 - [ ] Validación de CSV con preservación de datos en caso de error.
+- [x] Asegurar que la importación CSV también persiste el código de estudiante (`student_code`) y los apellidos extraídos del archivo (no solo nombre y email).
 - [ ] UI de lista de alumnos con búsqueda y filtrado por módulo/programación.
 
 ### 3.6.2 - Contexto de Evaluación
