@@ -1,10 +1,12 @@
-import { getEvaluationContext, computeStudentGrades, listPublishedPlans } from "@/domain/evaluation/actions";
+import { getEvaluationContext, computeStudentGrades, listPublishedPlans, getScoresForContext } from "@/domain/evaluation/actions";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MoveLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EvalTabs } from "./_components/EvalTabs";
 import { ContextSettingsPanel } from "./_components/ContextSettingsPanel";
+import { getPlan } from "@/domain/teaching-plan/actions";
+import type { TeachingPlanFull } from "@/domain/teaching-plan/types";
 
 interface EvalDetailPageProps {
   params: Promise<{ id: string }>;
@@ -18,7 +20,16 @@ export default async function EvalDetailPage({ params, searchParams }: EvalDetai
   if (!result.ok || !result.data) return notFound();
 
   const context = result.data;
-  const gradesResult = await computeStudentGrades(id);
+  const planResults = await Promise.all(
+    (context.plan_ids || []).map(planId => getPlan(planId))
+  );
+  const linkedPlans: TeachingPlanFull[] = planResults.filter(pr => pr.ok).map(pr => pr.data);
+  const scoresResult = await getScoresForContext(id);
+  const scoresForMatrix = scoresResult.ok ? scoresResult.data : [];
+  const gradesResult = await computeStudentGrades(id, {
+    plans: linkedPlans,
+    scores: scoresResult.ok ? scoresResult.data : undefined,
+  });
   const publishedPlansResult = await listPublishedPlans();
 
   const statusLabels = {
@@ -87,6 +98,9 @@ export default async function EvalDetailPage({ params, searchParams }: EvalDetai
         <EvalTabs
           context={context}
           gradesResult={gradesResult.ok ? gradesResult.data : null}
+          plans={linkedPlans}
+          scores={scoresForMatrix}
+          scoreError={scoresResult.ok ? undefined : scoresResult.error}
         />
       </div>
     </div>

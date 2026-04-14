@@ -1,17 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { type EvaluationContextFull, type GradeComputationResult } from "@/domain/evaluation/types";
+import { type EvaluationContextFull, type GradeComputationResult, type InstrumentScore } from "@/domain/evaluation/types";
 import { cn } from "@/lib/utils";
 import { Users, Grid3x3, BarChart3, Download } from "lucide-react";
 import { StudentsTab } from "./StudentsTab";
 import { GradeMatrixTab } from "./GradeMatrixTab";
 import { GradesTab } from "./GradesTab";
 import { ExportTab } from "./ExportTab";
+import type { TeachingPlanFull } from "@/domain/teaching-plan/types";
 
 interface EvalTabsProps {
   readonly context: EvaluationContextFull;
   readonly gradesResult: GradeComputationResult | null;
+  readonly plans: TeachingPlanFull[];
+  readonly scores: InstrumentScore[];
+  readonly scoreError?: string;
 }
 
 type TabId = "students" | "matrix" | "grades" | "export";
@@ -23,7 +27,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "export", label: "Exportación", icon: <Download className="h-4 w-4" /> },
 ];
 
-export function EvalTabs({ context, gradesResult }: EvalTabsProps) {
+export function EvalTabs({ context, gradesResult, plans, scores, scoreError }: EvalTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("students");
 
   return (
@@ -50,7 +54,14 @@ export function EvalTabs({ context, gradesResult }: EvalTabsProps) {
       {/* Tab content */}
       <div className="pt-6">
         {activeTab === "students" && <StudentsTab context={context} />}
-        {activeTab === "matrix" && <GradeMatrixTab context={context} />}
+        {activeTab === "matrix" && (
+          <GradeMatrixTab
+            context={context}
+            plans={plans}
+            scores={scores}
+            scoreError={scoreError}
+          />
+        )}
         {activeTab === "grades" && <GradesTab gradesResult={gradesResult} />}
         {activeTab === "export" && <ExportTab context={context} gradesResult={gradesResult} />}
       </div>

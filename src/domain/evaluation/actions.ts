@@ -392,7 +392,13 @@ async function contextId_from_student(
 // GRADE COMPUTATION
 // ─────────────────────────────────────────────
 
-export async function computeStudentGrades(contextId: string): Promise<ActionResponse<GradeComputationResult>> {
+export async function computeStudentGrades(
+  contextId: string,
+  options?: {
+    plans?: TeachingPlanFull[];
+    scores?: InstrumentScore[];
+  }
+): Promise<ActionResponse<GradeComputationResult>> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Usuario no autenticado" };
@@ -402,17 +408,26 @@ export async function computeStudentGrades(contextId: string): Promise<ActionRes
   if (!ctxResult.ok) return ctxResult;
   const context = ctxResult.data;
 
-  // 2. Get all linked teaching plans
+  // 2. Use provided plans or fetch linked plans
+  const planCache = options?.plans;
   const plans: TeachingPlanFull[] = [];
+  if (planCache && planCache.length > 0) {
+    plans.push(...planCache);
+  }
+  const existingPlanIds = new Set(plans.map(p => p.id));
   for (const planId of context.plan_ids || []) {
+    if (existingPlanIds.has(planId)) continue;
     const planResult = await getPlan(planId);
     if (planResult.ok) plans.push(planResult.data);
   }
 
-  // 3. Get all scores
-  const scoresResult = await getScoresForContext(contextId);
-  if (!scoresResult.ok) return scoresResult;
-  const scores = scoresResult.data;
+  // 3. Get all scores (use provided if available)
+  let scores = options?.scores;
+  if (!scores) {
+    const scoresResult = await getScoresForContext(contextId);
+    if (!scoresResult.ok) return scoresResult;
+    scores = scoresResult.data;
+  }
 
   // 4. Compute
   const result = computeAllStudentGrades(context, plans, scores);
