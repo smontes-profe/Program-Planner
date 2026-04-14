@@ -3,8 +3,14 @@ import { signOutAction } from "@/domain/auth/actions";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import Link from "next/link";
-import { GraduationCap, LogOut } from "lucide-react";
+import { GraduationCap, LogOut, BookCopy, CalendarDays, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const NAV_LINKS = [
+  { href: "/curriculum", label: "Currículos", icon: <BookCopy className="h-4 w-4" /> },
+  { href: "/plans", label: "Programaciones", icon: <CalendarDays className="h-4 w-4" /> },
+  { href: "/evaluations", label: "Evaluaciones", icon: <BarChart3 className="h-4 w-4" /> },
+];
 
 export async function Navbar() {
   const supabase = await createClient();
@@ -23,6 +29,26 @@ export async function Navbar() {
                 Program Planner
               </span>
             </Link>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {user && (
+              <div className="hidden md:flex items-center gap-1 ml-4">
+                {NAV_LINKS.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "h-8 text-xs gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+                    )}
+                  >
+                    {link.icon}
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">

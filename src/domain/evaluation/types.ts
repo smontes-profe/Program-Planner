@@ -73,3 +73,5 @@ export interface StudentGradeSummary {
     completionPercent: number;
   }[];
 }
+
+export type { GradeComputationResult } from "./grade-engine";
