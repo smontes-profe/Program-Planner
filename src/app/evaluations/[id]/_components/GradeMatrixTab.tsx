@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { GradeMatrixCsvImport } from "./GradeMatrixCsvImport";
 import { type EvaluationContextFull, type InstrumentScore } from "@/domain/evaluation/types";
 import type { TeachingPlanFull } from "@/domain/teaching-plan/types";
 import { upsertInstrumentScore } from "@/domain/evaluation/actions";
@@ -157,13 +158,14 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
 
   return (
     <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Matriz de notas</h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Filas = alumnos, columnas = instrumentos. Edita la nota (0-10) y se guarda automáticamente para el instrumento completo; el motor distribuye ese valor a RA/CE con los pesos configurados en la programación.
-            </p>
-          </div>
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Matriz de notas</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Filas = alumnos, columnas = instrumentos. Edita la nota (0-10) y se guarda automáticamente para el instrumento completo; el motor distribuye ese valor a RA/CE con los pesos configurados en la programación.
+          </p>
+        </div>
+        <GradeMatrixCsvImport contextId={context.id} />
         {scoreError && (
           <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 dark:border-rose-600 dark:bg-rose-900/40 dark:text-rose-200">
             No se pudieron cargar las notas ({scoreError})

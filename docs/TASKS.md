@@ -49,7 +49,7 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
 - [x] Tabla `instrument_student_scores` con campos: `id`, `evaluation_context_id`, `instrument_id`, `student_id`, `score_value`, `score_date`, `notes`, `created_at`, `updated_at`.
 - [x] Vista de matriz de notas: filas = alumnos, columnas = instrumentos (agrega scroll horizontal si es necesario y muestra código + nombre en cada columna).
 - [x] Celdas editables con entrada directa de nota (modo `simple` por defecto; cada instrumento solo admite una nota 0-10 y el motor la distribuye a RAs/CEs según sus pesos).
-- [ ] Importación masiva de notas desde CSV: columnas = código de instrumento, filas = alumno. Validación de códigos de instrumento contra la programación vinculada.
+- [x] Importación masiva de notas desde CSV: columnas = código de instrumento, filas = alumno. Validación de códigos de instrumento contra la programación vinculada.
 - [ ] Validación de CSV con preservación de datos en caso de error y reporte de errores por fila/columna.
 - [x] Los instrumentos deben tener su código correctamente asignado (requisito previo desde Phase 3B).
 
