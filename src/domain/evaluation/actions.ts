@@ -226,7 +226,7 @@ export async function unlinkTeachingPlan(
 
 export async function addStudent(
   contextId: string,
-  payload: { student_name: string; student_email?: string | null }
+  payload: { student_name: string; student_code?: string | null; student_email?: string | null }
 ): Promise<ActionResponse<EvaluationStudent>> {
   const validated = createStudentSchema.safeParse(payload);
   if (!validated.success) return { ok: false, error: "Datos inválidos" };
@@ -245,7 +245,7 @@ export async function addStudent(
 
 export async function updateStudent(
   studentId: string,
-  payload: { student_name?: string; student_email?: string | null; active?: boolean }
+  payload: { student_name?: string; student_code?: string | null; student_email?: string | null; active?: boolean }
 ): Promise<ActionResponse<EvaluationStudent>> {
   const validated = updateStudentSchema.safeParse(payload);
   if (!validated.success) return { ok: false, error: "Datos inválidos" };
@@ -277,7 +277,7 @@ export async function deleteStudent(studentId: string): Promise<ActionResponse> 
 
 export async function bulkImportStudents(
   contextId: string,
-  students: { student_name: string; student_email?: string | null }[]
+  students: { student_name: string; student_code?: string | null; student_email?: string | null }[]
 ): Promise<ActionResponse<EvaluationStudent[]>> {
   const validated = bulkImportStudentsSchema.safeParse({ students });
   if (!validated.success) return { ok: false, error: "Datos inválidos" };

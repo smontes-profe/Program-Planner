@@ -13,9 +13,68 @@ interface StudentsTabProps {
   readonly context: EvaluationContextFull;
 }
 
+/** Parse Moodle-style CSV (comma-separated, quoted, with Spanish decimal commas) */
+function parseMoodleCSV(text: string): { student_name: string; student_code: string | null; student_email: string | null }[] {
+  const lines = text.trim().split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  // Parse header to find column indices
+  const headerLine = lines[0];
+  const headers: string[] = [];
+  let inQuotes = false;
+  let current = "";
+  for (const ch of headerLine) {
+    if (ch === '"') { inQuotes = !inQuotes; continue; }
+    if (ch === "," && !inQuotes) { headers.push(current.trim()); current = ""; continue; }
+    current += ch;
+  }
+  if (current.trim()) headers.push(current.trim());
+
+  const idxApellidos = headers.findIndex(h => h.toLowerCase().includes("apellido"));
+  const idxNombre = headers.findIndex(h => h.toLowerCase() === "nombre");
+  const idxCodigo = headers.findIndex(h => h.toLowerCase().includes("id de estudiante"));
+  const idxEmail = headers.findIndex(h => h.toLowerCase().includes("usuario") || h.toLowerCase().includes("email"));
+
+  function parseLine(line: string): string[] {
+    const cols: string[] = [];
+    let q = false;
+    let cur = "";
+    for (const ch of line) {
+      if (ch === '"') { q = !q; continue; }
+      if (ch === "," && !q) { cols.push(cur.trim()); cur = ""; continue; }
+      cur += ch;
+    }
+    if (cur.trim()) cols.push(cur.trim());
+    return cols;
+  }
+
+  const results: { student_name: string; student_code: string | null; student_email: string | null }[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    if (cols.length < 2) continue;
+
+    const apellidos = idxApellidos >= 0 ? cols[idxApellidos] || "" : "";
+    const nombre = idxNombre >= 0 ? cols[idxNombre] || "" : "";
+    const code = idxCodigo >= 0 ? (cols[idxCodigo] || null) : null;
+    const email = idxEmail >= 0 ? (cols[idxEmail] || null) : null;
+
+    // Filter out rows with empty code (like preview users)
+    if (!code || code === "") continue;
+
+    results.push({
+      student_name: `${apellidos}, ${nombre}`.replace(/, $/, "").replace(/^, /, ""),
+      student_code: code,
+      student_email: email,
+    });
+  }
+
+  return results;
+}
+
 export function StudentsTab({ context }: StudentsTabProps) {
   const [students, setStudents] = useState(context.students);
   const [newName, setNewName] = useState("");
+  const [newCode, setNewCode] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
@@ -23,11 +82,12 @@ export function StudentsTab({ context }: StudentsTabProps) {
   async function handleAdd() {
     if (!newName.trim()) return;
     setIsPending(true);
-    const res = await addStudent(context.id, { student_name: newName, student_email: newEmail || null });
+    const res = await addStudent(context.id, { student_name: newName, student_code: newCode || null, student_email: newEmail || null });
     setIsPending(false);
     if (res.ok) {
       setStudents(prev => [...prev, res.data]);
       setNewName("");
+      setNewCode("");
       setNewEmail("");
       router.refresh();
     }
@@ -44,12 +104,9 @@ export function StudentsTab({ context }: StudentsTabProps) {
   }
 
   async function handleBulkImport(csvText: string) {
-    const lines = csvText.trim().split("\n").filter(l => l.trim());
-    const students = lines.map(line => {
-      const parts = line.split(",").map(p => p.trim());
-      return { student_name: parts[0], student_email: parts[1] || null };
-    });
-    const res = await bulkImportStudents(context.id, students);
+    const parsed = parseMoodleCSV(csvText);
+    if (parsed.length === 0) return;
+    const res = await bulkImportStudents(context.id, parsed);
     if (res.ok) {
       setStudents(prev => [...prev, ...res.data]);
       router.refresh();
@@ -63,7 +120,14 @@ export function StudentsTab({ context }: StudentsTabProps) {
       </div>
 
       {/* Add student form */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input
+          placeholder="Código alumno"
+          value={newCode}
+          onChange={(e) => setNewCode(e.target.value)}
+          className="w-32"
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+        />
         <Input
           placeholder="Nombre completo"
           value={newName}
@@ -98,7 +162,8 @@ export function StudentsTab({ context }: StudentsTabProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">#</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-8">#</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-24">Código</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Nombre</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Email</th>
                 <th className="text-right px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-16"></th>
@@ -108,6 +173,7 @@ export function StudentsTab({ context }: StudentsTabProps) {
               {students.map((s, i) => (
                 <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
                   <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{i + 1}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-zinc-500">{s.student_code || "—"}</td>
                   <td className="px-4 py-2 font-medium text-zinc-900 dark:text-zinc-100">{s.student_name}</td>
                   <td className="px-4 py-2 text-zinc-500 text-xs">{s.student_email || "—"}</td>
                   <td className="px-4 py-2 text-right">
@@ -154,7 +220,7 @@ function BulkImportForm({ onImport }: { onImport: (csv: string) => void }) {
 
   return (
     <div className="space-y-2 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-      <p className="text-xs text-zinc-500">Formato: una línea por alumno. Columnas: nombre, email (opcional).</p>
+      <p className="text-xs text-zinc-500">Pega el CSV exportado desde Moodle/GCV. Detecta automáticamente: Apellidos, Nombre, ID de estudiante y email.</p>
       <textarea
         rows={5}
         value={csvText}

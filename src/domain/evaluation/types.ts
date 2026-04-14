@@ -32,6 +32,7 @@ export interface EvaluationContextFull extends EvaluationContext {
 export interface EvaluationStudent {
   id: string;
   context_id: string;
+  student_code: string | null;
   student_name: string;
   student_email: string | null;
   active: boolean;

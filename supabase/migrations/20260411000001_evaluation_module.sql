@@ -31,6 +31,7 @@ CREATE INDEX idx_ecm_plan    ON public.evaluation_context_modules(teaching_plan_
 CREATE TABLE public.evaluation_students (
   id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   context_id             UUID NOT NULL REFERENCES public.evaluation_contexts(id) ON DELETE CASCADE,
+  student_code           TEXT,
   student_name           TEXT NOT NULL,
   student_email          TEXT,
   active                 BOOLEAN NOT NULL DEFAULT true,
@@ -38,6 +39,7 @@ CREATE TABLE public.evaluation_students (
 );
 
 CREATE INDEX idx_eval_students_context ON public.evaluation_students(context_id);
+CREATE INDEX idx_eval_students_code    ON public.evaluation_students(student_code);
 
 -- ─── 4. Instrument Scores (one row = one student + one instrument + one CE) ─
 CREATE TABLE public.instrument_student_scores (

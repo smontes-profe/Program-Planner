@@ -23,6 +23,7 @@ export const linkModuleToContextSchema = z.object({
 
 export const createStudentSchema = z.object({
   student_name: z.string().min(1).max(255),
+  student_code: z.string().max(50).nullable().optional(),
   student_email: z.string().email().nullable().optional(),
 });
 
@@ -33,6 +34,7 @@ export const updateStudentSchema = createStudentSchema.extend({
 export const bulkImportStudentsSchema = z.object({
   students: z.array(z.object({
     student_name: z.string().min(1),
+    student_code: z.string().nullable().optional(),
     student_email: z.string().email().nullable().optional(),
   })),
 });
