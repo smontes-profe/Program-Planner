@@ -18,36 +18,7 @@ Status legend:
 
 
 
-### Phase 3B - Unidades de Trabajo e Instrumentos
 
-- [x] Implement `plan_teaching_unit` schema with trimester assignment and hours field.
-- [x] Implement `plan_unit_ra` coverage table (which RAs a UT covers).
-- [x] `/plans/[id]` tab: Unidades de Trabajo (CRUD + RA/CE assignment per UT).
-- [x] Implement `evaluation_instruments` schema linked to a UT (Already done in migration).
-- [x] Implement `instrument_ce_weight` (which CEs an instrument covers and with what %) (Already done in migration).
-- [x] `/plans/[id]` tab: Instrumentos (CRUD + CE weight assignment per instrument).
-- [x] Añadir en la edición de instrumentos la entrada de porcentaje por RA cubierta y exigir que los porcentajes de CE dentro de cada RA sumen 100 % para poder derivar la aportación a cada CE.
-- [x] Añadir la opción “Automatizar pesos de CEs” en el tab de Pesos: permitir fijar la distribución por CE dentro de cada RA, validar que suma 100 % y que los instrumentos hereden esos pesos cuando está activada.
-- [x] Computed weights panel: target vs. real comparison per RA (global + per trimester).
-
-### Phase 3.5 - Teaching Plan Fixes and UX Improvements
-
-- [x] Validar que al menos un trimestre esté seleccionado al crear una UT. Actualmente lanza un error de base de datos (`at_least_one_trimester_chk`) en inglés. El error debe ser descriptivo, en castellano y preservar los datos del formulario.
-
-- [x] Simplificar estados de programación a `draft` y `published` (eliminar `ready` y `archived` del MVP):
-  - [x] Actualizar constraint DB de `status` a solo `draft` | `published`.
-  - [x] Actualizar tipo TypeScript `PlanStatus` y schema Zod.
-  - [x] Server Action `publishPlan(planId)`: cambia `draft → published`. No requiere validación bloqueante de invariantes.
-  - [x] Server Action `unpublishPlan(planId)`: cambia `published → draft`.
-  - [x] Una programación `published` es visible y seleccionable desde el módulo de Evaluaciones.
-  - [x] Una programación `published` se puede seguir editando sin cambiar su estado (los cambios de peso se recalculan sobre todas las notas existentes — ver nota de Opción B a futuro).
-  - [x] Panel de avisos en la vista de programación que muestre:
-    - RAs cuyo `weight_global` no suma 100%.
-    - Instrumentos sin pesos de RA definidos.
-    - CE sin pesos definidos dentro de un RA.
-  - [x] Botones de publicar/despublicar en la vista de detalle del plan.
-  - [x] Actualizar badges de status en lista y detalle (solo `draft` = "Borrador", `published` = "Publicada").
- - [x] BUGFIX for github action
 
 ## Phase 3.6 - Evaluaciones
 
@@ -274,3 +245,34 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
 - [x] `/plans` list page with plan cards and status.
 - [x] `/plans/[id]` detail page with Currículo tab (editable RA/CE clone) and Pesos tab.
 - [x] Enable homepage link to /plans.
+
+### Phase 3B - Unidades de Trabajo e Instrumentos
+
+- [x] Implement `plan_teaching_unit` schema with trimester assignment and hours field.
+- [x] Implement `plan_unit_ra` coverage table (which RAs a UT covers).
+- [x] `/plans/[id]` tab: Unidades de Trabajo (CRUD + RA/CE assignment per UT).
+- [x] Implement `evaluation_instruments` schema linked to a UT (Already done in migration).
+- [x] Implement `instrument_ce_weight` (which CEs an instrument covers and with what %) (Already done in migration).
+- [x] `/plans/[id]` tab: Instrumentos (CRUD + CE weight assignment per instrument).
+- [x] Añadir en la edición de instrumentos la entrada de porcentaje por RA cubierta y exigir que los porcentajes de CE dentro de cada RA sumen 100 % para poder derivar la aportación a cada CE.
+- [x] Añadir la opción “Automatizar pesos de CEs” en el tab de Pesos: permitir fijar la distribución por CE dentro de cada RA, validar que suma 100 % y que los instrumentos hereden esos pesos cuando está activada.
+- [x] Computed weights panel: target vs. real comparison per RA (global + per trimester).
+
+### Phase 3.5 - Teaching Plan Fixes and UX Improvements
+
+- [x] Validar que al menos un trimestre esté seleccionado al crear una UT. Actualmente lanza un error de base de datos (`at_least_one_trimester_chk`) en inglés. El error debe ser descriptivo, en castellano y preservar los datos del formulario.
+
+- [x] Simplificar estados de programación a `draft` y `published` (eliminar `ready` y `archived` del MVP):
+  - [x] Actualizar constraint DB de `status` a solo `draft` | `published`.
+  - [x] Actualizar tipo TypeScript `PlanStatus` y schema Zod.
+  - [x] Server Action `publishPlan(planId)`: cambia `draft → published`. No requiere validación bloqueante de invariantes.
+  - [x] Server Action `unpublishPlan(planId)`: cambia `published → draft`.
+  - [x] Una programación `published` es visible y seleccionable desde el módulo de Evaluaciones.
+  - [x] Una programación `published` se puede seguir editando sin cambiar su estado (los cambios de peso se recalculan sobre todas las notas existentes — ver nota de Opción B a futuro).
+  - [x] Panel de avisos en la vista de programación que muestre:
+    - RAs cuyo `weight_global` no suma 100%.
+    - Instrumentos sin pesos de RA definidos.
+    - CE sin pesos definidos dentro de un RA.
+  - [x] Botones de publicar/despublicar en la vista de detalle del plan.
+  - [x] Actualizar badges de status en lista y detalle (solo `draft` = "Borrador", `published` = "Publicada").
+ - [x] BUGFIX for github action
