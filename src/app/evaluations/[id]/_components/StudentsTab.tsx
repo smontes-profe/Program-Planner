@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { type EvaluationContextFull } from "@/domain/evaluation/types";
 import { addStudent, deleteStudent, bulkImportStudents } from "@/domain/evaluation/actions";
 import { useRouter } from "next/navigation";
@@ -86,6 +86,8 @@ function parseMoodleCSV(text: string): { student_name: string; last_name: string
   return results;
 }
 
+type SortKey = "last_name" | "student_name" | "student_email";
+
 export function StudentsTab({ context }: StudentsTabProps) {
   const [students, setStudents] = useState(context.students);
   const [newLastName, setNewLastName] = useState("");
@@ -94,6 +96,8 @@ export function StudentsTab({ context }: StudentsTabProps) {
   const [newEmail, setNewEmail] = useState("");
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
+  const [sortKey, setSortKey] = useState<SortKey>("last_name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -129,6 +133,46 @@ export function StudentsTab({ context }: StudentsTabProps) {
       router.refresh();
     }
   }
+
+  useEffect(() => {
+    setStudents(context.students);
+  }, [context.students]);
+
+  const sortedStudents = useMemo(() => {
+    const arr = [...students];
+    arr.sort((a, b) => {
+      const valA = (a[sortKey] ?? "").toLowerCase();
+      const valB = (b[sortKey] ?? "").toLowerCase();
+      if (valA === valB) {
+        const fallback = (a.student_name ?? "").localeCompare(b.student_name ?? "", undefined, { sensitivity: "base" });
+        return sortDirection === "asc" ? fallback : -fallback;
+      }
+      return sortDirection === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    });
+    return arr;
+  }, [students, sortDirection, sortKey]);
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDirection(dir => (dir === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  }
+
+  const renderSortableHeader = (label: string, key: SortKey) => (
+    <button
+      type="button"
+      onClick={() => handleSort(key)}
+      className="flex items-center gap-1 text-left font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+    >
+      <span>{label}</span>
+      {sortKey === key && (
+        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+      )}
+    </button>
+  );
 
   return (
     <div className="space-y-4">
@@ -188,14 +232,14 @@ export function StudentsTab({ context }: StudentsTabProps) {
               <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-8">#</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-20">ID</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Apellidos</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Nombre</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Email</th>
+                <th className="text-left px-4 py-2.5">{renderSortableHeader("Apellidos", "last_name")}</th>
+                <th className="text-left px-4 py-2.5">{renderSortableHeader("Nombre", "student_name")}</th>
+                <th className="text-left px-4 py-2.5">{renderSortableHeader("Email", "student_email")}</th>
                 <th className="text-right px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-16"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {students.map((s, i) => (
+              {sortedStudents.map((s, i) => (
                 <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
                   <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{i + 1}</td>
                   <td className="px-4 py-2 font-mono text-xs text-zinc-500">{s.student_code || "—"}</td>

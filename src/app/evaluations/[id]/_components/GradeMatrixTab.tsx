@@ -16,28 +16,17 @@ interface GradeMatrixTabProps {
 
 interface InstrumentColumn {
   instrumentId: string;
+  instrumentCode: string;
   instrumentName: string;
-  instrumentType: string;
-  planId: string;
-  planTitle: string;
-  unitLabel: string;
-  ceEntries: {
-    id: string;
-    code: string;
-    description: string;
-    weight: number;
-  }[];
-  isAdvanced: boolean;
-  hasUnits: boolean;
 }
 
-const scoreKey = (studentId: string, instrumentId: string, planCeId?: string | null) =>
-  `${studentId}:${instrumentId}:${planCeId ?? "null"}`;
+const scoreKey = (studentId: string, instrumentId: string) => `${studentId}:${instrumentId}`;
 
 const buildScoreMap = (scores: InstrumentScore[]) => {
   const map: Record<string, string> = {};
   for (const score of scores) {
-    const key = scoreKey(score.student_id, score.instrument_id, score.plan_ce_id);
+    const key = scoreKey(score.student_id, score.instrument_id);
+    if (map[key] && score.plan_ce_id) continue;
     map[key] = score.score_value !== null ? score.score_value.toString() : "";
   }
   return map;
@@ -54,66 +43,29 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
     setErrors({});
   }, [scores]);
 
-  const studentRows = useMemo(() => context.students.filter(s => s.active), [context.students]);
+  const studentRows = useMemo(
+    () => [...context.students.filter(s => s.active)].sort((a, b) => {
+      const lastCmp = (a.last_name ?? "").localeCompare(b.last_name ?? "", undefined, { sensitivity: "base" });
+      if (lastCmp !== 0) return lastCmp;
+      return (a.student_name ?? "").localeCompare(b.student_name ?? "", undefined, { sensitivity: "base" });
+    }),
+    [context.students]
+  );
 
   const planGroups = useMemo(() => {
     return plans.map(plan => {
-      const unitLookup = new Map<string, { code: string; trimester: string }>();
-      (plan.units || []).forEach(unit => {
-        unitLookup.set(unit.id, { code: unit.code, trimester: unit.trimester });
-      });
-
-      const ceLookup = new Map<string, { code: string; description: string }>();
-      (plan.ras || []).forEach(ra => {
-        (ra.ces || []).forEach(ce => {
-          ceLookup.set(ce.id, { code: ce.code, description: ce.description });
-        });
-      });
-
-      const columns: InstrumentColumn[] = (plan.instruments || []).map(instrument => {
-        const unitLabels = Array.from(
-          new Set(
-            (instrument.unit_ids || [])
-              .map(uid => unitLookup.get(uid))
-              .filter(Boolean)
-              .map(unit => `${unit?.code} (${unit?.trimester})`)
-          )
-        );
-
-        const ceEntries = (instrument.ce_weights || [])
-          .map(weight => {
-            const ce = ceLookup.get(weight.plan_ce_id);
-            if (!ce) return null;
-            return {
-              id: weight.plan_ce_id,
-              code: ce.code,
-              description: ce.description,
-              weight: Number(weight.weight) || 0,
-            };
-          })
-          .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
-
-        const isAdvanced = ceEntries.length > 1;
-
-        return {
-          instrumentId: instrument.id,
-          instrumentName: instrument.name,
-          instrumentType: instrument.type,
-          planId: plan.id,
-          planTitle: `${plan.module_code} · ${plan.title}`,
-          unitLabel: unitLabels.join(", "),
-          ceEntries,
-          isAdvanced,
-          hasUnits: unitLabels.length > 0,
-        };
-      });
+      const columns: InstrumentColumn[] = (plan.instruments || []).map(instrument => ({
+        instrumentId: instrument.id,
+        instrumentCode: instrument.code || instrument.name,
+        instrumentName: instrument.name,
+      }));
 
       return { plan, columns };
     });
   }, [plans]);
 
   const handleSave = useCallback(
-    (key: string, studentId: string, instrumentId: string, planCeId: string | null) => {
+    (key: string, studentId: string, instrumentId: string) => {
       startTransition(() => {
         (async () => {
           const raw = scoreValues[key] ?? "";
@@ -142,7 +94,7 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
             const result = await upsertInstrumentScore(context.id, {
               instrument_id: instrumentId,
               student_id: studentId,
-              plan_ce_id: planCeId || null,
+              plan_ce_id: null,
               score_value: value,
             });
             if (!result.ok) {
@@ -163,43 +115,7 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
   );
 
   const renderInstrumentCell = (instrument: InstrumentColumn, studentId: string) => {
-    if (instrument.isAdvanced) {
-      return (
-        <div className="space-y-3">
-          {instrument.ceEntries.map(ce => {
-            const key = scoreKey(studentId, instrument.instrumentId, ce.id);
-            const value = scoreValues[key] ?? "";
-            const isSaving = pendingKey === key;
-            return (
-              <div key={ce.id} className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 flex-1" title={ce.description}>
-                    {ce.code} ({ce.weight.toFixed(0)}%)
-                  </div>
-                  <div className="w-20">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={10}
-                      step={0.1}
-                      value={value}
-                      onChange={e => setScoreValues(prev => ({ ...prev, [key]: e.target.value }))}
-                      onBlur={() => handleSave(key, studentId, instrument.instrumentId, ce.id)}
-                    />
-                  </div>
-                  {isSaving && <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />}
-                </div>
-                {errors[key] && (
-                  <p className="text-rose-600 text-xs">{errors[key]}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    const key = scoreKey(studentId, instrument.instrumentId, null);
+    const key = scoreKey(studentId, instrument.instrumentId);
     const value = scoreValues[key] ?? "";
     const isSaving = pendingKey === key;
 
@@ -214,7 +130,7 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
             step={0.1}
             value={value}
             onChange={e => setScoreValues(prev => ({ ...prev, [key]: e.target.value }))}
-            onBlur={() => handleSave(key, studentId, instrument.instrumentId, null)}
+            onBlur={() => handleSave(key, studentId, instrument.instrumentId)}
           />
           {isSaving && <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />}
         </div>
@@ -241,13 +157,13 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Matriz de notas</h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Filas = alumnos, columnas = instrumentos (por módulo y UT). Edita la nota y se guarda automáticamente.
-          </p>
-        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Matriz de notas</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Filas = alumnos, columnas = instrumentos. Edita la nota (0-10) y se guarda automáticamente para el instrumento completo; el motor distribuye ese valor a RA/CE con los pesos configurados en la programación.
+            </p>
+          </div>
         {scoreError && (
           <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 dark:border-rose-600 dark:bg-rose-900/40 dark:text-rose-200">
             No se pudieron cargar las notas ({scoreError})
@@ -274,19 +190,20 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
               Esta programación no tiene instrumentos definidos todavía.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <div className="overflow-x-auto max-w-full rounded-xl border border-zinc-200 dark:border-zinc-800">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/50 dark:text-zinc-400">
                     <th className="px-4 py-3">Alumno</th>
                     {group.columns.map(column => (
                       <th key={column.instrumentId} className="px-3 py-3">
-                        <div className="text-xxs text-zinc-500 dark:text-zinc-400">
-                          {column.unitLabel || "Unidad sin UT"}
-                        </div>
-                        <div className="font-semibold text-zinc-900 dark:text-zinc-50">{column.instrumentName}</div>
-                        <div className="text-xxs text-zinc-500 dark:text-zinc-400">
-                          {column.instrumentType}
+                        <div className="space-y-1">
+                          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                            {column.instrumentCode}
+                          </span>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {column.instrumentName}
+                          </span>
                         </div>
                       </th>
                     ))}
