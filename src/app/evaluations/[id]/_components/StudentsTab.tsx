@@ -14,7 +14,7 @@ interface StudentsTabProps {
 }
 
 /** Parse Moodle-style CSV (comma-separated, quoted, with Spanish decimal commas) */
-function parseMoodleCSV(text: string): { student_name: string; student_code: string | null; student_email: string | null }[] {
+function parseMoodleCSV(text: string): { student_name: string; last_name: string; student_code: string | null; student_email: string | null }[] {
   // Normalize: strip BOM, Windows line endings
   const cleaned = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = cleaned.trim().split("\n").filter(l => l.trim());
@@ -32,11 +32,16 @@ function parseMoodleCSV(text: string): { student_name: string; student_code: str
   }
   if (current.trim()) headers.push(current.trim());
 
+  // Log for debugging
+  console.log("CSV headers:", headers);
+
   // Match columns flexibly
   const idxApellidos = headers.findIndex(h => h.toLowerCase().includes("apellido"));
-  const idxNombre = headers.findIndex(h => /^nombre$/i.test(h));
+  const idxNombre = headers.findIndex(h => /^nombre$/i.test(h.trim()));
   const idxCodigo = headers.findIndex(h => h.toLowerCase().includes("id de estudiante"));
-  const idxEmail = headers.findIndex(h => h.toLowerCase().includes("usuario") || h.toLowerCase().includes("email"));
+  const idxEmail = headers.findIndex(h => h.toLowerCase().includes("usuario"));
+
+  console.log("Indices:", { idxApellidos, idxNombre, idxCodigo, idxEmail });
 
   function parseLine(line: string): string[] {
     const cols: string[] = [];
@@ -51,31 +56,33 @@ function parseMoodleCSV(text: string): { student_name: string; student_code: str
     return cols;
   }
 
-  const results: { student_name: string; student_code: string | null; student_email: string | null }[] = [];
+  const results: { student_name: string; last_name: string; student_code: string | null; student_email: string | null }[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = parseLine(lines[i]);
-    if (cols.length < 2) continue;
 
-    const apellidos = idxApellidos >= 0 ? cols[idxApellidos] || "" : "";
-    const nombre = idxNombre >= 0 ? cols[idxNombre] || "" : "";
-    const code = idxCodigo >= 0 ? (cols[idxCodigo] || null) : null;
-    const email = idxEmail >= 0 ? (cols[idxEmail] || null) : null;
+    const apellidos = idxApellidos >= 0 ? (cols[idxApellidos] || "") : "";
+    const nombre = idxNombre >= 0 ? (cols[idxNombre] || "") : "";
+    const code = idxCodigo >= 0 ? cols[idxCodigo] : null;
+    const email = idxEmail >= 0 ? cols[idxEmail] : null;
 
     // Filter out rows with empty code (like preview users)
     if (!code || code === "") continue;
 
     results.push({
-      student_name: `${apellidos}, ${nombre}`.replace(/, $/, "").replace(/^, /, ""),
+      student_name: nombre || "",
+      last_name: apellidos || "",
       student_code: code,
-      student_email: email,
+      student_email: email || null,
     });
   }
 
+  console.log("Parsed students:", results.length);
   return results;
 }
 
 export function StudentsTab({ context }: StudentsTabProps) {
   const [students, setStudents] = useState(context.students);
+  const [newLastName, setNewLastName] = useState("");
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -85,10 +92,11 @@ export function StudentsTab({ context }: StudentsTabProps) {
   async function handleAdd() {
     if (!newName.trim()) return;
     setIsPending(true);
-    const res = await addStudent(context.id, { student_name: newName, student_code: newCode || null, student_email: newEmail || null });
+    const res = await addStudent(context.id, { student_name: newName, last_name: newLastName || null, student_code: newCode || null, student_email: newEmail || null });
     setIsPending(false);
     if (res.ok) {
       setStudents(prev => [...prev, res.data]);
+      setNewLastName("");
       setNewName("");
       setNewCode("");
       setNewEmail("");
@@ -128,14 +136,21 @@ export function StudentsTab({ context }: StudentsTabProps) {
           placeholder="ID"
           value={newCode}
           onChange={(e) => setNewCode(e.target.value)}
-          className="w-32"
+          className="w-24"
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         />
         <Input
-          placeholder="Nombre completo"
+          placeholder="Apellidos"
+          value={newLastName}
+          onChange={(e) => setNewLastName(e.target.value)}
+          className="w-56"
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+        />
+        <Input
+          placeholder="Nombre"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          className="w-64"
+          className="w-44"
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         />
         <Input
@@ -166,7 +181,8 @@ export function StudentsTab({ context }: StudentsTabProps) {
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-8">#</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-24">ID</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-20">ID</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Apellidos</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Nombre</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">Email</th>
                 <th className="text-right px-4 py-2.5 font-semibold text-zinc-600 dark:text-zinc-400 w-16"></th>
@@ -177,7 +193,8 @@ export function StudentsTab({ context }: StudentsTabProps) {
                 <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
                   <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{i + 1}</td>
                   <td className="px-4 py-2 font-mono text-xs text-zinc-500">{s.student_code || "—"}</td>
-                  <td className="px-4 py-2 font-medium text-zinc-900 dark:text-zinc-100">{s.student_name}</td>
+                  <td className="px-4 py-2 text-zinc-700 dark:text-zinc-300 text-sm">{s.last_name || "—"}</td>
+                  <td className="px-4 py-2 font-medium text-zinc-900 dark:text-zinc-100 text-sm">{s.student_name}</td>
                   <td className="px-4 py-2 text-zinc-500 text-xs">{s.student_email || "—"}</td>
                   <td className="px-4 py-2 text-right">
                     <button

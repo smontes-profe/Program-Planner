@@ -125,34 +125,39 @@ export default async function EvaluationsPage({ searchParams }: { searchParams?:
                       {ctx.student_count} alumno{ctx.student_count !== 1 ? "s" : ""}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm pt-2">
-                    <Link
-                      href={`/evaluations/${ctx.id}`}
-                      className={cn(buttonVariants({ variant: "default", size: "sm" }), "bg-emerald-600 hover:bg-emerald-700 text-white")}
-                    >
-                      Abrir
-                    </Link>
-                    <form action={async () => {
-                      "use server";
-                      await deleteEvaluationContext(ctx.id);
-                      revalidatePath("/evaluations");
-                    }}>
-                      <button
-                        type="submit"
-                        className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
-                        title="Eliminar contexto"
+                    <div className="flex justify-between items-center text-sm pt-2">
+                      <Link
+                        href={`/evaluations/${ctx.id}`}
+                        className={cn(buttonVariants({ variant: "default", size: "sm" }), "bg-emerald-600 hover:bg-emerald-700 text-white")}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </form>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                        Abrir
+                      </Link>
+                      <DeleteContextButton contextId={ctx.id} />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
         </div>
       )}
     </div>
+  );
+}
+
+function DeleteContextButton({ contextId }: { contextId: string }) {
+  return (
+    <button
+      onClick={async () => {
+        if (!confirm("¿Eliminar este contexto de evaluación? Esta acción no se puede deshacer.")) return;
+        const { deleteEvaluationContext } = await import("@/domain/evaluation/actions");
+        const res = await deleteEvaluationContext(contextId);
+        if (res.ok) window.location.reload();
+      }}
+      className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
+      title="Eliminar contexto"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
   );
 }
 
