@@ -8,6 +8,9 @@ import {
   type TrimesterKey,
 } from "@/domain/evaluation/types";
 import {
+  deleteFinalManualOverride,
+  deleteRAManualOverride,
+  deleteTrimesterAdjustedOverride,
   updateTrimesterLock,
   upsertFinalManualOverride,
   upsertRAManualOverride,
@@ -125,6 +128,9 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
       return;
     }
 
+    // Truncar silenciosamente a entero
+    const intValue = Math.floor(parsed.value);
+
     setPendingKey(key);
     startTransition(() => {
       void (async () => {
@@ -133,18 +139,14 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
             context_id: contextId,
             student_id: studentId,
             trimester_key: trimester,
-            adjusted_grade: parsed.value,
+            adjusted_grade: intValue,
           });
           if (!result.ok) {
             setErrors(prev => ({ ...prev, [key]: result.error }));
             return;
           }
-          setErrors(prev => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-          });
-          setTrimesterInputs(prev => ({ ...prev, [key]: formatInputValue(parsed.value) }));
+          setErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+          setTrimesterInputs(prev => ({ ...prev, [key]: formatInputValue(intValue) }));
           setStudentGrades(prev =>
             prev.map(item =>
               item.studentId === studentId
@@ -152,7 +154,7 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                     ...item,
                     trimesterGrades: item.trimesterGrades.map(current =>
                       current.key === trimester
-                        ? { ...current, adjustedGrade: parsed.value, adjustedIsManual: true }
+                        ? { ...current, adjustedGrade: intValue, adjustedIsManual: true }
                         : current
                     ),
                   }
@@ -178,6 +180,12 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
       return;
     }
 
+    // Si el valor es menor que el autocalculado, revertir a estado automático
+    const autoBaseline = ra.improvedAutoGrade ?? ra.originalGrade;
+    if (autoBaseline !== null && parsed.value < autoBaseline) {
+      resetRAImproved(studentId, raId);
+      return;
+    }
     setPendingKey(key);
     startTransition(() => {
       void (async () => {
@@ -274,6 +282,83 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
     });
   };
 
+  const resetTrimesterAdjusted = (studentId: string, trimester: TrimesterKey) => {
+    const key = `tri:${studentId}:${trimester}`;
+    const student = studentGrades.find(s => s.studentId === studentId);
+    const tri = student?.trimesterGrades.find(t => t.key === trimester);
+    if (!student || !tri || !tri.adjustedIsManual) return;
+    setPendingKey(key);
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await deleteTrimesterAdjustedOverride({ context_id: contextId, student_id: studentId, trimester_key: trimester });
+          if (!result.ok) { setErrors(prev => ({ ...prev, [key]: result.error })); return; }
+          setErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+          const newAdjusted = tri.autoGrade === null ? null : Math.floor(tri.autoGrade);
+          setTrimesterInputs(prev => ({ ...prev, [key]: formatInputValue(newAdjusted) }));
+          setStudentGrades(prev => prev.map(item => item.studentId !== studentId ? item : {
+            ...item,
+            trimesterGrades: item.trimesterGrades.map(t => t.key !== trimester ? t : { ...t, adjustedGrade: newAdjusted, adjustedIsManual: false }),
+          }));
+        } finally { setPendingKey(null); }
+      })();
+    });
+  };
+
+  const resetRAImproved = (studentId: string, raId: string) => {
+    const key = `ra:${studentId}:${raId}`;
+    const student = studentGrades.find(s => s.studentId === studentId);
+    const ra = student?.raGrades.find(r => r.raId === raId);
+    if (!student || !ra || !ra.improvedIsManual) return;
+    setPendingKey(key);
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await deleteRAManualOverride({ context_id: contextId, student_id: studentId, plan_ra_id: raId });
+          if (!result.ok) { setErrors(prev => ({ ...prev, [key]: result.error })); return; }
+          setErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+          const autoGrade = ra.improvedAutoGrade ?? null;
+          setRaInputs(prev => ({ ...prev, [key]: formatInputValue(autoGrade) }));
+          setStudentGrades(prev => prev.map(item => {
+            if (item.studentId !== studentId) return item;
+            const updatedRas = item.raGrades.map(r => r.raId !== raId ? r : {
+              ...r, improvedGrade: autoGrade, improvedIsManual: false,
+              improvedCompletionPercent: r.originalCompletionPercent,
+              improvedHasMissingData: autoGrade === null || r.originalCompletionPercent < 100,
+            });
+            return recomputeFinals({ ...item, raGrades: updatedRas });
+          }));
+        } finally { setPendingKey(null); }
+      })();
+    });
+  };
+
+  const resetFinalImproved = (studentId: string) => {
+    const key = `final:${studentId}`;
+    const student = studentGrades.find(s => s.studentId === studentId);
+    if (!student || !student.finalImprovedIsManual) return;
+    setPendingKey(key);
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await deleteFinalManualOverride({ context_id: contextId, student_id: studentId });
+          if (!result.ok) { setErrors(prev => ({ ...prev, [key]: result.error })); return; }
+          setErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+          const autoGrade = student.finalImprovedAutoGrade ?? null;
+          setFinalInputs(prev => ({ ...prev, [key]: formatInputValue(autoGrade) }));
+          setStudentGrades(prev => prev.map(item => item.studentId !== studentId ? item : {
+            ...item,
+            finalImprovedGrade: autoGrade,
+            finalImprovedIsManual: false,
+            finalImprovedHasMissingData: autoGrade === null,
+            finalGrade: autoGrade,
+          }));
+        } finally { setPendingKey(null); }
+      })();
+    });
+  };
+
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
@@ -324,48 +409,48 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full min-w-[1180px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-zinc-50 text-xs font-semibold text-zinc-600 dark:bg-zinc-900/50 dark:text-zinc-400">
               <tr>
-                <th className="px-3 py-2.5 text-left">Alumno</th>
-                {TRIMESTERS.map(trimester => <th key={trimester} colSpan={2} className="px-3 py-2.5 text-center">{trimester}</th>)}
-                <th colSpan={2} className="px-3 py-2.5 text-center">Final</th>
+                <th className="px-3 py-2 text-left">Alumno</th>
+                {TRIMESTERS.map(trimester => <th key={trimester} colSpan={2} className="px-1 py-2 text-center">{trimester}</th>)}
+                <th colSpan={2} className="px-1 py-2 text-center">Final</th>
               </tr>
               <tr>
-                <th className="px-3 py-2.5 text-left">&nbsp;</th>
+                <th className="px-3 py-1.5 text-left">&nbsp;</th>
                 {TRIMESTERS.map(trimester => (
                   <Fragment key={`${trimester}-sub`}>
-                    <th className="px-3 py-2.5 text-center">Auto</th>
-                    <th className="px-3 py-2.5 text-center">Ajustada</th>
+                    <th className="px-1 py-1.5 text-center">Auto</th>
+                    <th className="px-1 py-1.5 text-center">Ajustada</th>
                   </Fragment>
                 ))}
-                <th className="px-3 py-2.5 text-center">Auto</th>
-                <th className="px-3 py-2.5 text-center">Mejorada</th>
+                <th className="px-1 py-1.5 text-center">Auto</th>
+                <th className="px-1 py-1.5 text-center">Mejorada</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {sortedStudents.map(student => (
                 <tr key={student.studentId} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
-                  <td className="px-3 py-3 text-xs font-semibold">{formatStudentName(student)}</td>
+                  <td className="px-3 py-2 text-xs font-semibold">{formatStudentName(student)}</td>
                   {TRIMESTERS.map(trimester => {
                     const tri = student.trimesterGrades.find(t => t.key === trimester);
                     if (!tri) {
-                      return <Fragment key={`${student.studentId}-${trimester}`}><td className="px-3 py-3 text-center">-</td><td className="px-3 py-3 text-center">-</td></Fragment>;
+                      return <Fragment key={`${student.studentId}-${trimester}`}><td className="px-1 py-2 text-center">-</td><td className="px-1 py-2 text-center">-</td></Fragment>;
                     }
                     const key = `tri:${student.studentId}:${trimester}`;
                     const value = trimesterInputs[key] ?? formatInputValue(tri.adjustedGrade);
                     return (
                       <Fragment key={`${student.studentId}-${trimester}`}>
-                        <td className="px-3 py-3 text-center">
+                        <td className="px-1 py-2 text-center">
                           <span className={cn("font-mono text-xs font-semibold", gradeColorClass(tri.autoGrade))}>{formatGrade(tri.autoGrade)}</span>
                           {tri.autoHasMissingData && <AlertTriangle className="ml-1 inline h-3 w-3 text-amber-500" />}
                           {tri.autoIsLocked && <Lock className="ml-1 inline h-3 w-3 text-zinc-400" />}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          <div className="inline-flex items-center gap-1">
+                        <td className="px-1 py-2 text-center">
+                          <div className="inline-flex items-center gap-0.5">
                             <Input
                               className={cn(
-                                "h-8 w-[74px] text-center text-xs",
+                                "h-7 w-[62px] text-center text-xs",
                                 errors[key]
                                   ? "border-rose-400"
                                   : tri.adjustedGrade !== null && tri.adjustedGrade >= 5
@@ -379,17 +464,24 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                               onChange={e => setTrimesterInputs(prev => ({ ...prev, [key]: e.target.value }))}
                               onBlur={() => saveTrimesterAdjusted(student.studentId, trimester)}
                             />
-                            {pendingKey === key && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />}
-                            {tri.adjustedIsManual && <PencilLine className="h-3.5 w-3.5 text-blue-500" />}
-                            {tri.adjustedHasMissingData && (
-                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            {pendingKey === key && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
+                            {tri.adjustedIsManual && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <button type="button" onClick={() => resetTrimesterAdjusted(student.studentId, trimester)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30" aria-label="Restablecer ajuste">
+                                    <PencilLine className="h-3 w-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">Clic para restablecer al valor automático</TooltipContent>
+                              </Tooltip>
                             )}
+                            {tri.adjustedHasMissingData && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                           </div>
                         </td>
                       </Fragment>
                     );
                   })}
-                  <td className="px-3 py-3 text-center">
+                  <td className="px-1 py-2 text-center">
                     <div className="inline-flex items-center gap-1">
                       <span className={cn("font-mono text-xs font-semibold", gradeColorClass(student.finalOriginalAutoGrade))}>
                         {formatGrade(student.finalOriginalAutoGrade)}
@@ -399,15 +491,24 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                       )}
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-center">
+                  <td className="px-1 py-2 text-center">
                     {(() => {
                       const key = `final:${student.studentId}`;
                       const value = finalInputs[key] ?? formatInputValue(student.finalImprovedGrade);
                       return (
-                        <div className="inline-flex items-center gap-1">
-                          <Input className={cn("h-8 w-[80px] text-center text-xs", errors[key] && "border-rose-400")} type="number" min={0} max={10} step={1} value={value} onChange={e => setFinalInputs(prev => ({ ...prev, [key]: e.target.value }))} onBlur={() => saveFinalImproved(student.studentId)} />
-                          {pendingKey === key && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />}
-                          {student.finalImprovedIsManual && <PencilLine className="h-3.5 w-3.5 text-blue-500" />}
+                        <div className="inline-flex items-center gap-0.5">
+                          <Input className={cn("h-7 w-[62px] text-center text-xs", errors[key] && "border-rose-400")} type="number" min={0} max={10} step={0.01} value={value} onChange={e => setFinalInputs(prev => ({ ...prev, [key]: e.target.value }))} onBlur={() => saveFinalImproved(student.studentId)} />
+                          {pendingKey === key && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
+                          {student.finalImprovedIsManual && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <button type="button" onClick={() => resetFinalImproved(student.studentId)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30" aria-label="Restablecer nota final">
+                                  <PencilLine className="h-3 w-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">Clic para restablecer al valor automático</TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                       );
                     })()}
@@ -440,29 +541,29 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[600px] text-sm">
             <thead className="bg-zinc-50 text-xs font-semibold text-zinc-600 dark:bg-zinc-900/50 dark:text-zinc-400">
               <tr>
-                <th className="px-3 py-2.5 text-left">Alumno</th>
-                {raColumns.map(ra => <th key={ra.raId} colSpan={2} className="px-3 py-2.5 text-center">RA {ra.raCode}</th>)}
+                <th className="px-3 py-2 text-left">Alumno</th>
+                {raColumns.map(ra => <th key={ra.raId} colSpan={2} className="px-1 py-2 text-center">RA {ra.raCode}</th>)}
               </tr>
               <tr>
-                <th className="px-3 py-2.5 text-left">&nbsp;</th>
-                {raColumns.map(ra => <Fragment key={`${ra.raId}-labels`}><th className="px-3 py-2.5 text-center">Original</th><th className="px-3 py-2.5 text-center">Mejorada</th></Fragment>)}
+                <th className="px-3 py-1.5 text-left">&nbsp;</th>
+                {raColumns.map(ra => <Fragment key={`${ra.raId}-labels`}><th className="px-1 py-1.5 text-center">Original</th><th className="px-1 py-1.5 text-center">Mejorada</th></Fragment>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {sortedStudents.map(student => (
                 <tr key={`ra-${student.studentId}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
-                  <td className="px-3 py-3 text-xs font-semibold">{formatStudentName(student)}</td>
+                  <td className="px-3 py-2 text-xs font-semibold">{formatStudentName(student)}</td>
                   {raColumns.map(column => {
                     const ra = student.raGrades.find(item => item.raId === column.raId);
-                    if (!ra) return <Fragment key={`${student.studentId}-${column.raId}`}><td className="px-3 py-3 text-center">-</td><td className="px-3 py-3 text-center">-</td></Fragment>;
+                    if (!ra) return <Fragment key={`${student.studentId}-${column.raId}`}><td className="px-1 py-2 text-center">-</td><td className="px-1 py-2 text-center">-</td></Fragment>;
                     const key = `ra:${student.studentId}:${column.raId}`;
                     const value = raInputs[key] ?? formatInputValue(ra.improvedGrade);
                     return (
                       <Fragment key={`${student.studentId}-${column.raId}`}>
-                        <td className="px-3 py-3 text-center">
+                        <td className="px-1 py-2 text-center">
                           <div className="inline-flex items-center gap-1">
                             <span className={cn("font-mono text-xs font-semibold", gradeColorClass(ra.originalGrade))}>
                               {formatGrade(ra.originalGrade)}
@@ -475,20 +576,29 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          <div className="inline-flex items-center gap-1">
+                        <td className="px-1 py-2 text-center">
+                          <div className="inline-flex items-center gap-0.5">
                             <Input
                               className={cn(
-                                "h-8 w-[74px] text-center text-xs",
+                                "h-7 w-[62px] text-center text-xs",
                                 errors[key] && "border-rose-400",
                               )}
-                              type="number" min={0} max={10} step={1}
+                              type="number" min={0} max={10} step={0.01}
                               value={value}
                               onChange={e => setRaInputs(prev => ({ ...prev, [key]: e.target.value }))}
                               onBlur={() => saveRAImproved(student.studentId, column.raId)}
                             />
-                            {pendingKey === key && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />}
-                            {ra.improvedIsManual && <PencilLine className="h-3.5 w-3.5 text-blue-500" />}
+                            {pendingKey === key && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
+                            {ra.improvedIsManual && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <button type="button" onClick={() => resetRAImproved(student.studentId, column.raId)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30" aria-label="Restablecer nota RA">
+                                    <PencilLine className="h-3 w-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">Clic para restablecer al valor automático</TooltipContent>
+                              </Tooltip>
+                            )}
                             {ra.improvedHasMissingData && ra.originalCompletionPercent === 0 && (
                               <Circle className="h-3 w-3 fill-rose-500 text-rose-500" />
                             )}
@@ -544,6 +654,15 @@ function parseGrade(raw: string): { ok: true; value: number } | { ok: false; err
   if (value.length === 0 || Number.isNaN(parsed)) return { ok: false, error: "Introduce una nota valida." };
   if (parsed < 0 || parsed > 10) return { ok: false, error: "La nota debe estar entre 0 y 10." };
   return { ok: true, value: Math.round(parsed * 100) / 100 };
+}
+
+function parseGradeInteger(raw: string): { ok: true; value: number } | { ok: false; error: string } {
+  const value = raw.replace(",", ".").trim();
+  const parsed = Number(value);
+  if (value.length === 0 || Number.isNaN(parsed)) return { ok: false, error: "Introduce una nota valida." };
+  if (parsed < 0 || parsed > 10) return { ok: false, error: "La nota debe estar entre 0 y 10." };
+  if (!Number.isInteger(parsed)) return { ok: false, error: "La nota ajustada debe ser un numero entero (sin decimales)." };
+  return { ok: true, value: parsed };
 }
 
 function formatGrade(value: number | null): string {

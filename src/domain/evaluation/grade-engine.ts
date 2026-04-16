@@ -192,12 +192,12 @@ function computeSingleStudentGrade(params: ComputeSingleStudentGradeParams): Stu
         plan,
         raId: ra.id,
         scoreLookup,
+        originalGrade: original.grade,
       });
-      const improvedAutoGrade = priPmiImpacts.length > 0
-        ? priPmiImpacts[0].scoreValue
-        : original.grade;
+      const bestApplied = priPmiImpacts.find(i => i.isApplied);
+      const improvedAutoGrade = bestApplied ? bestApplied.scoreValue : null;
       const manualOverride = raManualOverrideMap.get(raOverrideKey(studentId, ra.id));
-      const improvedGrade = manualOverride ?? improvedAutoGrade;
+      const improvedGrade = manualOverride ?? improvedAutoGrade ?? original.grade;
       const improvedIsManual = manualOverride !== undefined;
       const improvedCompletionPercent = improvedGrade === null
         ? original.completionPercent
@@ -393,6 +393,7 @@ function buildPriPmiImpactsForRA(params: {
   plan: TeachingPlanFull;
   raId: string;
   scoreLookup: StudentScoreLookup;
+  originalGrade: number | null;
 }): StudentRAGradeSummary["priPmiImpacts"] {
   const impacts = (params.plan.instruments || [])
     .filter(inst => inst.is_pri_pmi && instrumentTouchesRA(inst, params.raId))
@@ -409,13 +410,14 @@ function buildPriPmiImpactsForRA(params: {
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .sort((a, b) => {
-      const aTs = parseDateToTimestamp(a.scoreDate);
-      const bTs = parseDateToTimestamp(b.scoreDate);
-      return bTs - aTs;
-    });
+    // Ordenar por nota descendente: el mejor primero
+    .sort((a, b) => b.scoreValue - a.scoreValue);
 
-  if (impacts.length > 0) {
+  // Solo marcar como aplicada la mejor nota si supera estrictamente la nota original
+  if (
+    impacts.length > 0 &&
+    (params.originalGrade === null || impacts[0].scoreValue > params.originalGrade)
+  ) {
     impacts[0] = { ...impacts[0], isApplied: true };
   }
 

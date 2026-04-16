@@ -614,6 +614,58 @@ export async function upsertFinalManualOverride(payload: {
   return { ok: true, data: data as EvaluationFinalManualOverride };
 }
 
+export async function deleteTrimesterAdjustedOverride(payload: {
+  context_id: string;
+  student_id: string;
+  trimester_key: TrimesterKey;
+}): Promise<ActionResponse> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("evaluation_trimester_adjusted_overrides")
+    .delete()
+    .eq("context_id", payload.context_id)
+    .eq("student_id", payload.student_id)
+    .eq("trimester_key", payload.trimester_key);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/evaluations/${payload.context_id}`);
+  return { ok: true, data: null };
+}
+
+export async function deleteRAManualOverride(payload: {
+  context_id: string;
+  student_id: string;
+  plan_ra_id: string;
+}): Promise<ActionResponse> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("evaluation_ra_manual_overrides")
+    .delete()
+    .eq("context_id", payload.context_id)
+    .eq("student_id", payload.student_id)
+    .eq("plan_ra_id", payload.plan_ra_id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/evaluations/${payload.context_id}`);
+  return { ok: true, data: null };
+}
+
+export async function deleteFinalManualOverride(payload: {
+  context_id: string;
+  student_id: string;
+}): Promise<ActionResponse> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("evaluation_final_manual_overrides")
+    .delete()
+    .eq("context_id", payload.context_id)
+    .eq("student_id", payload.student_id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/evaluations/${payload.context_id}`);
+  return { ok: true, data: null };
+}
+
 // ─────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────

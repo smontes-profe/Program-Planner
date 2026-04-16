@@ -86,12 +86,22 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
   - Nota final mejorada manual: editable por docente; si se modifica a mano queda fija y solo cambia manualmente.
   - Mostrar indicador visual cuando la nota final mejorada se haya ajustado manualmente.
   - Alerta en nota final autocalculada si hay datos incompletos.
+- [x] UX polish tabla de notas (2026-04-16):
+  - Reducir padding de celdas numericas (px-3 -> px-1.5) y ancho de inputs (74/80px -> 52px, h-8 -> h-7).
+  - Reducir min-width de tablas (trimestres: 1180px -> 820px, RA: 980px -> 600px).
+  - Icono boli (PencilLine) clickable en columnas Ajustada (trimestre) y Mejorada (RA y Final): al hacer click borra el override manual y revierte al valor autocalculado. Tooltip de aviso incluido.
+  - Nuevas Server Actions: `deleteTrimesterAdjustedOverride`, `deleteRAManualOverride`, `deleteFinalManualOverride` en `actions.ts`.
 
 ### 3.6.5 - Exportación de Notas
 
 - [x] Exportar notas por alumno en CSV: columnas = nombre, email, nota final, notas por RA, notas por trimestre.
+  - Exportacion mejorada (2026-04-16): ordenacion por apellidos/nombre, columnas Codigo+Apellidos+Nombre separadas, escape correcto de campos CSV con comas/comillas, columnas RA original/mejorada y trimestre auto/ajustada ya incluidas.
 - [ ] Exportar matriz completa de instrumentos en CSV: filas = alumnos, columnas = instrumentos + notas calculadas.
-- [ ] Exportar acta de evaluación: documento resumen con notas finales por alumno y estadísticas del grupo.
+- [ ] Exportar acta de evaluacion: documento resumen con notas finales por alumno y estadisticas del grupo.
+
+### 3.6.x - Bugs corregidos (2026-04-16)
+
+- [x] Bug PostgREST: "more than one relationship found for evaluation_contexts and evaluation_students". Causa: `instrument_student_scores` tambien tiene FK a `evaluation_contexts` con columna `student_id`, lo que genera ambiguedad. Fix: usar sintaxis `!constraint_name` en el embed de Supabase (`evaluation_students!evaluation_students_context_id_fkey`). Ver `actions.ts:listEvaluationContexts`.
 
 ### 3.6.6 - UI y Navegación
 
