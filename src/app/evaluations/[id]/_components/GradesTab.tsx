@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, Loader2, Lock, PencilLine } from "lucide-react";
+import { AlertTriangle, Circle, Loader2, Lock, PencilLine } from "lucide-react";
 
 interface GradesTabProps {
   readonly contextId: string;
@@ -298,6 +298,31 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
           })}
         </div>
 
+        {/* Leyenda — tabla de trimestres */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-lg border border-zinc-200 bg-zinc-50/60 px-3 py-2 text-[11px] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+          <span className="font-semibold text-zinc-600 dark:text-zinc-300">Leyenda:</span>
+          <span className="inline-flex items-center gap-1">
+            <span className="font-mono font-semibold text-emerald-600">8.50</span>
+            <span>Aprobado (≥ 5)</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="font-mono font-semibold text-rose-600">3.20</span>
+            <span>Suspenso (&lt; 5)</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3 text-amber-500" />
+            <span>Datos incompletos</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Lock className="h-3 w-3 text-zinc-400" />
+            <span>Trimestre cerrado (auto congelada)</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <PencilLine className="h-3.5 w-3.5 text-blue-500" />
+            <span>Ajuste manual</span>
+          </span>
+        </div>
+
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
           <table className="w-full min-w-[1180px] text-sm">
             <thead className="bg-zinc-50 text-xs font-semibold text-zinc-600 dark:bg-zinc-900/50 dark:text-zinc-400">
@@ -338,16 +363,41 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                         </td>
                         <td className="px-3 py-3 text-center">
                           <div className="inline-flex items-center gap-1">
-                            <Input className={cn("h-8 w-[74px] text-center text-xs", errors[key] && "border-rose-400")} type="number" min={0} max={10} step={1} value={value} onChange={e => setTrimesterInputs(prev => ({ ...prev, [key]: e.target.value }))} onBlur={() => saveTrimesterAdjusted(student.studentId, trimester)} />
+                            <Input
+                              className={cn(
+                                "h-8 w-[74px] text-center text-xs",
+                                errors[key]
+                                  ? "border-rose-400"
+                                  : tri.adjustedGrade !== null && tri.adjustedGrade >= 5
+                                    ? "border-emerald-400 dark:border-emerald-600"
+                                    : tri.adjustedGrade !== null
+                                      ? "border-rose-300 dark:border-rose-600"
+                                      : "",
+                              )}
+                              type="number" min={0} max={10} step={1}
+                              value={value}
+                              onChange={e => setTrimesterInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                              onBlur={() => saveTrimesterAdjusted(student.studentId, trimester)}
+                            />
                             {pendingKey === key && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />}
                             {tri.adjustedIsManual && <PencilLine className="h-3.5 w-3.5 text-blue-500" />}
+                            {tri.adjustedHasMissingData && (
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            )}
                           </div>
                         </td>
                       </Fragment>
                     );
                   })}
                   <td className="px-3 py-3 text-center">
-                    <span className={cn("font-mono text-xs font-semibold", gradeColorClass(student.finalOriginalAutoGrade))}>{formatGrade(student.finalOriginalAutoGrade)}</span>
+                    <div className="inline-flex items-center gap-1">
+                      <span className={cn("font-mono text-xs font-semibold", gradeColorClass(student.finalOriginalAutoGrade))}>
+                        {formatGrade(student.finalOriginalAutoGrade)}
+                      </span>
+                      {student.finalOriginalHasMissingData && (
+                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3 text-center">
                     {(() => {
@@ -366,6 +416,27 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Leyenda — tabla de RA */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-lg border border-zinc-200 bg-zinc-50/60 px-3 py-2 text-[11px] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+          <span className="font-semibold text-zinc-600 dark:text-zinc-300">Notas por RA —</span>
+          <span className="inline-flex items-center gap-1">
+            <Circle className="h-3 w-3 fill-rose-500 text-rose-500" />
+            <span>Sin evaluar (0%)</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3 text-amber-500" />
+            <span>Evaluación parcial (&lt; 100%)</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <PencilLine className="h-3.5 w-3.5 text-blue-500" />
+            <span>Nota mejorada ajustada manualmente</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-600">PRI</span>
+            <span>Nota mejorada por PRI/PMI</span>
+          </span>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -391,19 +462,50 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                     const value = raInputs[key] ?? formatInputValue(ra.improvedGrade);
                     return (
                       <Fragment key={`${student.studentId}-${column.raId}`}>
-                        <td className="px-3 py-3 text-center"><span className={cn("font-mono text-xs font-semibold", gradeColorClass(ra.originalGrade))}>{formatGrade(ra.originalGrade)}</span></td>
                         <td className="px-3 py-3 text-center">
                           <div className="inline-flex items-center gap-1">
-                            <Input className={cn("h-8 w-[74px] text-center text-xs", errors[key] && "border-rose-400")} type="number" min={0} max={10} step={1} value={value} onChange={e => setRaInputs(prev => ({ ...prev, [key]: e.target.value }))} onBlur={() => saveRAImproved(student.studentId, column.raId)} />
+                            <span className={cn("font-mono text-xs font-semibold", gradeColorClass(ra.originalGrade))}>
+                              {formatGrade(ra.originalGrade)}
+                            </span>
+                            {ra.originalGrade === null && ra.originalCompletionPercent === 0 && (
+                              <Circle className="h-3 w-3 fill-rose-500 text-rose-500" />
+                            )}
+                            {ra.originalHasMissingData && ra.originalCompletionPercent > 0 && (
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <Input
+                              className={cn(
+                                "h-8 w-[74px] text-center text-xs",
+                                errors[key] && "border-rose-400",
+                              )}
+                              type="number" min={0} max={10} step={1}
+                              value={value}
+                              onChange={e => setRaInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                              onBlur={() => saveRAImproved(student.studentId, column.raId)}
+                            />
                             {pendingKey === key && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />}
                             {ra.improvedIsManual && <PencilLine className="h-3.5 w-3.5 text-blue-500" />}
+                            {ra.improvedHasMissingData && ra.originalCompletionPercent === 0 && (
+                              <Circle className="h-3 w-3 fill-rose-500 text-rose-500" />
+                            )}
+                            {ra.improvedHasMissingData && ra.originalCompletionPercent > 0 && (
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            )}
                             {ra.priPmiImpacts.length > 0 && (
                               <Tooltip>
                                 <TooltipTrigger>
                                   <button type="button" className="rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-600">PRI</button>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-[280px] text-xs">
-                                  {ra.priPmiImpacts.map(impact => <p key={`${impact.instrumentId}:${impact.scoreDate ?? "none"}`}>{impact.instrumentCode}: {impact.scoreValue.toFixed(2)}{impact.isApplied ? " (aplicada)" : ""}</p>)}
+                                  {ra.priPmiImpacts.map(impact => (
+                                    <p key={`${impact.instrumentId}:${impact.scoreDate ?? "none"}`}>
+                                      {impact.instrumentCode}: {impact.scoreValue.toFixed(2)}{impact.isApplied ? " (aplicada)" : ""}
+                                    </p>
+                                  ))}
                                 </TooltipContent>
                               </Tooltip>
                             )}

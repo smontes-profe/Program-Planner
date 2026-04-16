@@ -13,25 +13,47 @@ export function ExportTab({ context, gradesResult }: ExportTabProps) {
   function exportStudentGradesCSV() {
     if (!gradesResult) return;
 
-    const headers = ["Nombre", "Email", "Final auto (original)", "Final mejorada", "Completado (%)"];
-    // Add RA columns
-    if (gradesResult.studentGrades.length > 0) {
-      for (const ra of gradesResult.studentGrades[0].raGrades) {
+    /** Escapa un campo CSV que pueda contener comas o comillas */
+    const esc = (v: string) =>
+      v.includes(",") || v.includes('"') || v.includes("\n")
+        ? `"${v.replace(/"/g, '""')}"`
+        : v;
+
+    // Ordenar igual que GradesTab (apellidos, nombre)
+    const sorted = [...gradesResult.studentGrades].sort((a, b) => {
+      const la = (a.studentLastName ?? "").toLowerCase();
+      const lb = (b.studentLastName ?? "").toLowerCase();
+      if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity: "base" });
+      return a.studentFirstName.localeCompare(b.studentFirstName, undefined, { sensitivity: "base" });
+    });
+
+    const headers = [
+      "Código",
+      "Apellidos",
+      "Nombre",
+      "Email",
+      "Final original (auto)",
+      "Final mejorada",
+      "Completado (%)",
+    ];
+    if (sorted.length > 0) {
+      for (const ra of sorted[0].raGrades) {
         headers.push(`RA ${ra.raCode} original`);
         headers.push(`RA ${ra.raCode} mejorada`);
       }
-      // Add trimester columns
-      for (const tri of gradesResult.studentGrades[0].trimesterGrades) {
+      for (const tri of sorted[0].trimesterGrades) {
         headers.push(`${tri.key} auto`);
         headers.push(`${tri.key} ajustada`);
       }
     }
 
-    const rows = gradesResult.studentGrades.map((sg) => {
+    const rows = sorted.map((sg) => {
       const student = context.students.find(st => st.id === sg.studentId);
       const row = [
-        sg.studentName,
-        student?.student_email || "",
+        esc(student?.student_code || ""),
+        esc(sg.studentLastName || ""),
+        esc(sg.studentFirstName || sg.studentName || ""),
+        esc(student?.student_email || ""),
         sg.finalOriginalAutoGrade !== null ? sg.finalOriginalAutoGrade.toFixed(2) : "",
         sg.finalImprovedGrade !== null ? sg.finalImprovedGrade.toFixed(2) : "",
         sg.finalCompletionPercent.toFixed(0),
@@ -64,14 +86,14 @@ export function ExportTab({ context, gradesResult }: ExportTabProps) {
         <ExportCard
           icon={<FileSpreadsheet className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />}
           title="Notas por alumno"
-          description="CSV con nota final, notas por RA y por trimestre."
+          description="CSV con código, apellidos, nombre, email, nota final original y mejorada, notas originales y mejoradas por RA, y notas auto y ajustadas por trimestre (T1/T2/T3). Los PRI/PMI se reflejan en las columnas mejoradas."
           onClick={exportStudentGradesCSV}
           disabled={!gradesResult || gradesResult.studentGrades.length === 0}
         />
         <ExportCard
           icon={<Users className="h-8 w-8 text-zinc-600 dark:text-zinc-400" />}
           title="Listado de alumnos"
-          description="CSV simple con nombre y email de todos los alumnos."
+          description="CSV simple con nombre y email de todos los alumnos del contexto."
           onClick={exportStudentListCSV}
           disabled={context.students.length === 0}
         />

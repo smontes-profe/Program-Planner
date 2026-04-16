@@ -62,7 +62,7 @@ export async function listEvaluationContexts(): Promise<ActionResponse<Evaluatio
     .select(`
       *,
       modules:evaluation_context_modules(teaching_plan_id),
-      student_count:evaluation_students(count)
+      student_count:evaluation_students!evaluation_students_context_id_fkey(count)
     `)
     .order("created_at", { ascending: false });
 
