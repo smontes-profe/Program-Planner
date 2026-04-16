@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { type GradeComputationResult, type StudentGradeSummary } from "@/domain/evaluation/types";
 import { cn } from "@/lib/utils";
 import { AlertCircle, AlertTriangle, BarChart3, Users, TrendingUp } from "lucide-react";
@@ -15,6 +14,36 @@ interface RAColumn {
 }
 
 export function GradesTab({ gradesResult }: GradesTabProps) {
+  const studentGrades = gradesResult?.studentGrades ?? [];
+  const groupStats = gradesResult?.groupStats ?? {
+    averageFinalGrade: null,
+    medianFinalGrade: null,
+    gradedStudents: 0,
+    totalStudents: 0,
+  };
+
+  const sortedStudentGrades = [...studentGrades].sort((a, b) => {
+    const lastA = (a.studentLastName ?? "").toLowerCase();
+    const lastB = (b.studentLastName ?? "").toLowerCase();
+    if (lastA && lastB && lastA !== lastB) return lastA.localeCompare(lastB, undefined, { sensitivity: "base" });
+    if (lastA !== lastB) return lastA ? -1 : 1;
+    const firstA = (a.studentFirstName ?? "").toLowerCase();
+    const firstB = (b.studentFirstName ?? "").toLowerCase();
+    return firstA.localeCompare(firstB, undefined, { sensitivity: "base" });
+  });
+
+  const raColumnsMap = new Map<string, RAColumn>();
+  for (const student of studentGrades) {
+    for (const ra of student.raGrades) {
+      if (!raColumnsMap.has(ra.raId)) {
+        raColumnsMap.set(ra.raId, { raId: ra.raId, raCode: ra.raCode });
+      }
+    }
+  }
+  const raColumns = Array.from(raColumnsMap.values()).sort((a, b) =>
+    a.raCode.localeCompare(b.raCode, undefined, { sensitivity: "base" })
+  );
+
   if (!gradesResult) {
     return (
       <div className="space-y-4">
@@ -25,30 +54,6 @@ export function GradesTab({ gradesResult }: GradesTabProps) {
       </div>
     );
   }
-
-  const { studentGrades, groupStats } = gradesResult;
-  const sortedStudentGrades = useMemo(() => {
-    return [...studentGrades].sort((a, b) => {
-      const lastA = (a.studentLastName ?? "").toLowerCase();
-      const lastB = (b.studentLastName ?? "").toLowerCase();
-      if (lastA && lastB && lastA !== lastB) return lastA.localeCompare(lastB, undefined, { sensitivity: "base" });
-      if (lastA !== lastB) return lastA ? -1 : 1;
-      const firstA = (a.studentFirstName ?? "").toLowerCase();
-      const firstB = (b.studentFirstName ?? "").toLowerCase();
-      return firstA.localeCompare(firstB, undefined, { sensitivity: "base" });
-    });
-  }, [studentGrades]);
-  const raColumns = useMemo(() => {
-    const map = new Map<string, RAColumn>();
-    for (const student of studentGrades) {
-      for (const ra of student.raGrades) {
-        if (!map.has(ra.raId)) {
-          map.set(ra.raId, { raId: ra.raId, raCode: ra.raCode });
-        }
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => a.raCode.localeCompare(b.raCode, undefined, { sensitivity: "base" }));
-  }, [studentGrades]);
 
   if (studentGrades.length === 0) {
     return (

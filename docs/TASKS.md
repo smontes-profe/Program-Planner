@@ -94,6 +94,7 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
   - Exportación
 - [ ] Responsive y accesible (breakpoints 320px, 768px, 1280px).
 - [x] Estados vacíos, de carga y error implementados.
+- [x] Corregir lint de `GradesTab` por hooks condicionales (`useMemo`) para que el workflow de GitHub no falle.
 
 ### 3.6.7 - Autorización y RLS
 
