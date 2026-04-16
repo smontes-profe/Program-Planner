@@ -3,18 +3,21 @@ import { signOutAction } from "@/domain/auth/actions";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import Link from "next/link";
-import { GraduationCap, LogOut, BookCopy, CalendarDays, BarChart3 } from "lucide-react";
+import { GraduationCap, LogOut, BookCopy, CalendarDays, BarChart3, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/curriculum", label: "Currículos", icon: <BookCopy className="h-4 w-4" /> },
+  { href: "/curriculum", label: "Curriculos", icon: <BookCopy className="h-4 w-4" /> },
   { href: "/plans", label: "Programaciones", icon: <CalendarDays className="h-4 w-4" /> },
   { href: "/evaluations", label: "Evaluaciones", icon: <BarChart3 className="h-4 w-4" /> },
+  { href: "/account", label: "Mi cuenta", icon: <ShieldCheck className="h-4 w-4" /> },
 ];
 
 export async function Navbar() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
@@ -34,7 +37,7 @@ export async function Navbar() {
           <div className="flex items-center gap-2">
             {user && (
               <div className="hidden md:flex items-center gap-1 ml-4">
-                {NAV_LINKS.map(link => (
+                {NAV_LINKS.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -55,31 +58,35 @@ export async function Navbar() {
             {user ? (
               <div className="flex items-center gap-4">
                 <div className="hidden md:flex flex-col items-end">
-                   <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{user.email}</span>
-                   <span className="text-[10px] items-center gap-1 font-bold text-emerald-600 dark:text-emerald-500 flex uppercase tracking-wider">
-                      <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" /> Conectado
-                   </span>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{user.email}</span>
+                  <span className="text-[10px] items-center gap-1 font-bold text-emerald-600 dark:text-emerald-500 flex uppercase tracking-wider">
+                    <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" /> Conectado
+                  </span>
                 </div>
                 <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-800" />
+                <Link
+                  href="/account"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "sm" }),
+                    "h-9 gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+                  )}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mi cuenta</span>
+                </Link>
                 <form action={signOutAction}>
                   <Button variant="ghost" size="sm" className="h-9 gap-2 text-zinc-500 hover:text-destructive dark:hover:text-destructive-foreground">
                     <LogOut className="h-4 w-4" />
-                    <span className="hidden sm:inline">Cerrar Sesión</span>
+                    <span className="hidden sm:inline">Cerrar sesion</span>
                   </Button>
                 </form>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <Link 
-                  href="/auth" 
-                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-9")}
-                >
+                <Link href="/auth" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-9")}>
                   Entrar
                 </Link>
-                <Link 
-                  href="/auth" 
-                  className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9 bg-emerald-600 hover:bg-emerald-700")}
-                >
+                <Link href="/auth" className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9 bg-emerald-600 hover:bg-emerald-700")}>
                   Empezar
                 </Link>
               </div>

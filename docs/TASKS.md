@@ -239,6 +239,12 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
 - [x] Fix: Apply missing database migrations (profiles, organizations, memberships).
 - [x] Add session middleware for protected routes.
 
+### Phase 1.6 - Auth Hardening (Urgente Producción)
+
+- [x] Corregir registro con email ya existente: no mostrar éxito falso cuando `signUp` no crea una cuenta usable.
+- [-] Implementar recuperación de contraseña funcional (flujo completo de solicitud + actualización) o degradar explícitamente como `WIP` si hay bloqueo técnico real.
+- [x] Habilitar espacio para usuarios autenticados donde puedan cambiar su contraseña de forma segura.
+
 ## Phase 2.5 - Curriculum Fixes and improvements
 
 - [x] No se puede editar ni eliminar un RA ya creado.

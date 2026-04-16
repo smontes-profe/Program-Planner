@@ -9,24 +9,36 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
-export function AuthForm() {
+type AuthState = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  fields?: Record<string, string>;
+};
+
+interface AuthFormProps {
+  readonly initialError?: string | null;
+}
+
+export function AuthForm({ initialError }: AuthFormProps) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  
+  const initialState: AuthState = { ok: false, error: initialError ?? undefined };
+
   const [state, formAction, isPending] = useActionState(
-    async (prevState: any, formData: FormData) => {
+    async (prevState: AuthState, formData: FormData) => {
       if (mode === "signin") {
         return signInAction(prevState, formData);
-      } else {
-        return signUpAction(prevState, formData);
       }
+      return signUpAction(prevState, formData);
     },
-    { ok: false, error: "" } as any
+    initialState
   );
 
-  const title = mode === "signin" ? "Inicia Sesión" : "Crea una cuenta";
-  const description = mode === "signin" 
-    ? "Accede a tus currículos y programaciones." 
-    : "Únete a Program Planner para gestionar tus clases.";
+  const title = mode === "signin" ? "Inicia sesion" : "Crea una cuenta";
+  const description =
+    mode === "signin"
+      ? "Accede a tus curriculos y programaciones."
+      : "Unete a Program Planner para gestionar tus clases.";
 
   return (
     <Card className="border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md animate-in slide-in-from-bottom-10 duration-500">
@@ -41,10 +53,10 @@ export function AuthForm() {
           {description}
         </CardDescription>
       </CardHeader>
-      
+
       <form action={formAction}>
         <CardContent className="space-y-5">
-           {state.error && !state.ok && (
+          {state.error && !state.ok && (
             <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-lg flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <p className="font-semibold">{state.error}</p>
@@ -61,86 +73,91 @@ export function AuthForm() {
           <div className="space-y-4">
             {mode === "signup" && (
               <div className="space-y-2">
-                <Label htmlFor="full_name" className="text-zinc-700 dark:text-zinc-300">Nombre Completo</Label>
-                <Input 
-                  id="full_name" 
-                  name="full_name" 
-                  placeholder="Ej: David García" 
+                <Label htmlFor="full_name" className="text-zinc-700 dark:text-zinc-300">
+                  Nombre completo
+                </Label>
+                <Input
+                  id="full_name"
+                  name="full_name"
+                  placeholder="Ej: David Garcia"
                   required={mode === "signup"}
                   defaultValue={state.fields?.full_name ?? ""}
                   className="h-10 border-zinc-200 dark:border-zinc-800 focus:ring-emerald-500"
                 />
               </div>
             )}
-            
+
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300">Correo Electrónico</Label>
-              <Input 
-                id="email" 
-                name="email" 
-                type="email" 
-                placeholder="nombre@ejemplo.com" 
-                required 
+              <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300">
+                Correo electronico
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="nombre@ejemplo.com"
+                required
                 defaultValue={state.fields?.email ?? ""}
                 className="h-10 border-zinc-200 dark:border-zinc-800 focus:ring-emerald-500"
               />
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password text-zinc-700 dark:text-zinc-300">Contraseña</Label>
+                <Label htmlFor="password" className="text-zinc-700 dark:text-zinc-300">
+                  Contrasena
+                </Label>
                 {mode === "signin" && (
-                  <Link href="#" className="text-xs font-semibold text-zinc-500 hover:text-emerald-600 transition-colors">
-                    ¿Olvidaste tu contraseña?
+                  <Link href="/auth/forgot-password" className="text-xs font-semibold text-zinc-500 hover:text-emerald-600 transition-colors">
+                    Olvide mi contrasena
                   </Link>
                 )}
               </div>
-              <Input 
-                id="password" 
-                name="password" 
-                type="password" 
-                placeholder="••••••••" 
-                required 
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="********"
+                required
                 className="h-10 border-zinc-200 dark:border-zinc-800 focus:ring-emerald-500"
               />
+              {mode === "signup" && (
+                <p className="text-[11px] text-zinc-500">Minimo 8 caracteres.</p>
+              )}
             </div>
           </div>
         </CardContent>
-        
+
         <CardFooter className="flex flex-col gap-5 pt-0">
-          <Button 
-            type="submit" 
-            className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all shadow-lg shadow-emerald-600/10 active:scale-95" 
+          <Button
+            type="submit"
+            className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all shadow-lg shadow-emerald-600/10 active:scale-95"
             disabled={isPending}
           >
-            {isPending ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              mode === "signin" ? "Continuar" : "Crear mi cuenta"
-            )}
+            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === "signin" ? "Continuar" : "Crear mi cuenta"}
           </Button>
-          
+
           <div className="text-sm text-center text-zinc-500 dark:text-zinc-400 font-medium">
             {mode === "signin" ? (
               <>
-                ¿No tienes una cuenta?{" "}
-                <button 
-                  type="button" 
+                No tienes una cuenta?{" "}
+                <button
+                  type="button"
                   onClick={() => setMode("signup")}
                   className="font-bold text-emerald-600 dark:text-emerald-500 underline underline-offset-4 decoration-current/30 hover:decoration-current transition-all"
                 >
-                  Regístrate
+                  Registrate
                 </button>
               </>
             ) : (
               <>
-                ¿Ya tienes una cuenta?{" "}
-                <button 
-                  type="button" 
+                Ya tienes una cuenta?{" "}
+                <button
+                  type="button"
                   onClick={() => setMode("signin")}
                   className="font-bold text-emerald-600 dark:text-emerald-500 underline underline-offset-4 decoration-current/30 hover:decoration-current transition-all"
                 >
-                  Identifícate
+                  Identificate
                 </button>
               </>
             )}
