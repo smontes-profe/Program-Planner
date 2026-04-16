@@ -61,6 +61,14 @@ const updatePlatformRoleSchema = z.object({
   make_admin: z.enum(["true", "false"]),
 });
 
+const directCreateUserSchema = z.object({
+  full_name: z.string().trim().min(3, "Indica nombre y apellidos."),
+  email: z.string().trim().email("Email no valido."),
+  assigned_password: z.string().min(8, "La contrasena asignada debe tener al menos 8 caracteres."),
+  account_type: z.enum(["admin", "user"]),
+  organization_id: z.string().uuid(),
+});
+
 async function requirePlatformAdmin() {
   const supabase = await createClient();
   const {
@@ -367,4 +375,81 @@ export async function updateUserPlatformAdminAction(formData: FormData) {
 
   revalidatePath("/admin");
   return toAdminRedirect(makeAdmin ? "Usuario promovido a admin." : "Usuario cambiado a usuario normal.");
+}
+
+export async function createDirectUserAction(formData: FormData) {
+  await requirePlatformAdmin();
+  const adminClient = createAdminClient();
+
+  const rawPayload = {
+    full_name: String(formData.get("full_name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    assigned_password: String(formData.get("assigned_password") ?? ""),
+    account_type: String(formData.get("account_type") ?? ""),
+    organization_id: String(formData.get("organization_id") ?? ""),
+  };
+
+  const validated = directCreateUserSchema.safeParse(rawPayload);
+  if (!validated.success) {
+    return toAdminRedirect(validated.error.issues[0]?.message ?? "No se pudo crear el usuario.", true);
+  }
+
+  const data = validated.data;
+  const normalizedEmail = data.email.toLowerCase();
+
+  const { data: existingProfile } = await adminClient
+    .from("profiles")
+    .select("id")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (existingProfile?.id) {
+    return toAdminRedirect("Ya existe un usuario con ese email.", true);
+  }
+
+  const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
+    email: normalizedEmail,
+    password: data.assigned_password,
+    email_confirm: true,
+    user_metadata: { full_name: data.full_name },
+  });
+
+  if (createError) {
+    return toAdminRedirect(`No se pudo crear el usuario: ${createError.message}`, true);
+  }
+
+  const profileId = createdUser.user?.id;
+  if (!profileId) {
+    return toAdminRedirect("Usuario creado sin identificador de perfil.", true);
+  }
+
+  const makePlatformAdmin = data.account_type === "admin";
+  const orgRole = makePlatformAdmin ? "org_manager" : "teacher";
+
+  const { error: profileError } = await adminClient
+    .from("profiles")
+    .update({
+      full_name: data.full_name,
+      is_platform_admin: makePlatformAdmin,
+    })
+    .eq("id", profileId);
+  if (profileError) {
+    return toAdminRedirect(`No se pudo actualizar el perfil: ${profileError.message}`, true);
+  }
+
+  const { error: membershipError } = await adminClient.from("organization_memberships").upsert(
+    {
+      organization_id: data.organization_id,
+      profile_id: profileId,
+      role_in_org: orgRole,
+      is_active: true,
+    },
+    { onConflict: "organization_id,profile_id" }
+  );
+  if (membershipError) {
+    return toAdminRedirect(`No se pudo crear la membresia: ${membershipError.message}`, true);
+  }
+
+  revalidatePath("/admin");
+  return toAdminRedirect(`Usuario creado correctamente: ${normalizedEmail}.`);
 }

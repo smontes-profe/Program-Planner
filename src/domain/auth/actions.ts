@@ -235,7 +235,10 @@ export async function updateOwnPasswordAction(
  */
 export async function signOutAction() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    redirect(`/auth?error=${encodeURIComponent("No se pudo cerrar la sesion. Intentalo de nuevo.")}`);
+  }
   revalidatePath("/");
-  redirect("/");
+  redirect("/auth");
 }

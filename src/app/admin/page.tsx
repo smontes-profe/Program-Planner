@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, Shield, Users } from "lucide-react";
 import {
   approveAccessRequestAction,
+  createDirectUserAction,
   getAdminDashboardData,
   rejectAccessRequestAction,
   updateUserPlatformAdminAction,
@@ -46,6 +47,68 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <span>{error}</span>
         </div>
       )}
+
+      <Card className="border-zinc-200 dark:border-zinc-800">
+        <CardHeader>
+          <CardTitle>Alta directa de usuario</CardTitle>
+          <CardDescription>
+            Crea cuentas sin pasar por solicitud previa. Puedes asignar rol y organizacion inicial.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={createDirectUserAction} className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="direct-full-name">Nombre y apellidos</Label>
+              <Input id="direct-full-name" name="full_name" required placeholder="Ej: Laura Martinez Ruiz" />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="direct-email">Email</Label>
+              <Input id="direct-email" name="email" type="email" required placeholder="usuario@centro.com" />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="direct-password">Contrasena inicial</Label>
+              <Input id="direct-password" name="assigned_password" type="text" minLength={8} required />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="direct-account-type">Tipo de cuenta</Label>
+              <select
+                id="direct-account-type"
+                name="account_type"
+                defaultValue="user"
+                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                <option value="user">Usuario normal</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="direct-organization">Organizacion</Label>
+              <select
+                id="direct-organization"
+                name="organization_id"
+                required
+                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                {data.organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2 flex justify-end">
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                Crear usuario
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card className="border-zinc-200 dark:border-zinc-800">
         <CardHeader>
@@ -227,4 +290,3 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     </div>
   );
 }
-

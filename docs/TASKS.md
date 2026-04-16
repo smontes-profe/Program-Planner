@@ -254,6 +254,8 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
 - [x] En aprobación, crear usuario y permitir asignar tipo de cuenta (`admin` o `usuario normal`) y organización de destino.
 - [x] Añadir listado de usuarios existentes en panel admin y permitir cambiar privilegio de `platform_admin`.
 - [-] Revisar notificaciones por email para nuevas solicitudes y resolución (si no es viable ahora, dejarlo explicitado como pendiente).
+- [x] Corregir cierre de sesión en navbar (asegurar ejecución real del `signOutAction`).
+- [x] Permitir alta directa de usuarios desde panel admin (nombre, email, contraseña, tipo de cuenta y organización).
 
 ## Phase 2.5 - Curriculum Fixes and improvements
 

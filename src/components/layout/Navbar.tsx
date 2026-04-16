@@ -83,7 +83,7 @@ export async function Navbar() {
                   <span className="hidden sm:inline">Mi cuenta</span>
                 </Link>
                 <form action={signOutAction}>
-                  <Button variant="ghost" size="sm" className="h-9 gap-2 text-zinc-500 hover:text-destructive dark:hover:text-destructive-foreground">
+                  <Button type="submit" variant="ghost" size="sm" className="h-9 gap-2 text-zinc-500 hover:text-destructive dark:hover:text-destructive-foreground">
                     <LogOut className="h-4 w-4" />
                     <span className="hidden sm:inline">Cerrar sesion</span>
                   </Button>
