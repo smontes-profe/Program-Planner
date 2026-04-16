@@ -256,6 +256,7 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
 - [-] Revisar notificaciones por email para nuevas solicitudes y resolución (si no es viable ahora, dejarlo explicitado como pendiente).
 - [x] Corregir cierre de sesión en navbar (asegurar ejecución real del `signOutAction`).
 - [x] Permitir alta directa de usuarios desde panel admin (nombre, email, contraseña, tipo de cuenta y organización).
+- [x] Corregir warning Base UI en `request-access` por cambio de `defaultValue` en campos no controlados tras submit.
 
 ## Phase 2.5 - Curriculum Fixes and improvements
 

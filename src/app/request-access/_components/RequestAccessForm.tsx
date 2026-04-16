@@ -53,7 +53,6 @@ export function RequestAccessForm() {
               name="full_name"
               required
               placeholder="Ej: Maria Perez Lopez"
-              defaultValue={state.fields?.full_name ?? ""}
             />
           </div>
 
@@ -65,7 +64,6 @@ export function RequestAccessForm() {
               type="email"
               required
               placeholder="nombre@ejemplo.com"
-              defaultValue={state.fields?.email ?? ""}
             />
           </div>
 
@@ -90,4 +88,3 @@ export function RequestAccessForm() {
     </Card>
   );
 }
-
