@@ -581,7 +581,7 @@ function BulkImportForm({ onSelect }: { onSelect: (csv: string, fileName: string
       
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>
+          <TooltipTrigger>
             <span role="button" className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-help">
               <Info className="h-4 w-4" />
             </span>
