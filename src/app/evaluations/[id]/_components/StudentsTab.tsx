@@ -1,20 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { type EvaluationContextFull } from "@/domain/evaluation/types";
+import { type EvaluationContextFull, type EvaluationStudent } from "@/domain/evaluation/types";
 import { addStudent, deleteStudent, bulkImportStudents } from "@/domain/evaluation/actions";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Loader2, UserPlus, FileUp } from "lucide-react";
+import { Plus, Trash2, Loader2, UserPlus, FileUp, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface StudentsTabProps {
   readonly context: EvaluationContextFull;
 }
 
+interface ParsedStudentRow {
+  student_name: string;
+  last_name: string | null;
+  student_code: string | null;
+  student_email: string | null;
+  error?: string;
+}
+
 /** Parse Moodle-style CSV (comma-separated, quoted, with Spanish decimal commas) */
-function parseMoodleCSV(text: string): { student_name: string; last_name: string | null; student_code: string | null; student_email: string | null }[] {
+function parseMoodleCSV(text: string): { data: ParsedStudentRow[]; errors: string[] } {
   const normalizeHeader = (value: string) =>
     value
       .normalize("NFD")
@@ -44,7 +53,7 @@ function parseMoodleCSV(text: string): { student_name: string; last_name: string
 
   const cleaned = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = cleaned.trim().split("\n").filter(l => l.trim());
-  if (lines.length < 2) return [];
+  if (lines.length < 2) return { data: [], errors: ["El archivo está vacío o no tiene cabecera."] };
 
   const header = parseRow(lines[0]);
   const normalizedHeaders = header.map(normalizeHeader);
@@ -58,7 +67,16 @@ function parseMoodleCSV(text: string): { student_name: string; last_name: string
     h => h.includes("usuario") || h.includes("email") || h.includes("correo")
   );
 
-  const results: { student_name: string; last_name: string | null; student_code: string | null; student_email: string | null }[] = [];
+  const results: ParsedStudentRow[] = [];
+  const parseErrors: string[] = [];
+
+  // Basic header validation
+  if (idxNombre === -1 && idxApellidos === -1) {
+    parseErrors.push("No se encontró la columna de 'Nombre' o 'Apellidos'.");
+  }
+  if (idxCodigo === -1) {
+    parseErrors.push("No se encontró la columna de 'ID' o 'Identificador'.");
+  }
   for (let i = 1; i < lines.length; i++) {
     const cols = parseRow(lines[i]);
     const getValue = (idx: number) => (idx >= 0 ? cols[idx] ?? "" : "");
@@ -68,22 +86,38 @@ function parseMoodleCSV(text: string): { student_name: string; last_name: string
     const codigo = getValue(idxCodigo);
     const email = getValue(idxEmail);
 
-    if (!nombre && !apellidos) continue;
+    if (!nombre && !apellidos) {
+      results.push({
+        student_name: "",
+        last_name: null,
+        student_code: codigo || null,
+        student_email: email || null,
+        error: "Nombre y apellidos ausentes",
+      });
+      continue;
+    }
 
-    const studentCode = codigo ? codigo : null;
-    if (!studentCode) continue; // Ignore preview rows without ID
-
-    const studentName = nombre || apellidos || "";
+    if (!codigo) {
+      results.push({
+        student_name: nombre || apellidos || "",
+        last_name: apellidos || null,
+        student_code: null,
+        student_email: email || null,
+        error: "Código de estudiante (ID) ausente",
+      });
+      continue;
+    }
 
     results.push({
-      student_name: studentName,
+      student_name: nombre || apellidos || "",
       last_name: apellidos ? apellidos : null,
-      student_code: studentCode,
-      student_email: email ? email : null,
+      student_code: codigo,
+      student_email: email ? (email.includes("@") ? email : null) : null,
+      error: email && !email.includes("@") ? "Email inválido" : undefined,
     });
   }
 
-  return results;
+  return { data: results, errors: parseErrors };
 }
 
 type SortKey = "last_name" | "student_name" | "student_email";
@@ -94,10 +128,12 @@ export function StudentsTab({ context }: StudentsTabProps) {
   const [newName, setNewName] = useState("");
   const [newCode, setNewCode] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("last_name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [importPreview, setImportPreview] = useState<{ data: ParsedStudentRow[]; fileName: string } | null>(null);
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -124,22 +160,46 @@ export function StudentsTab({ context }: StudentsTabProps) {
     }
   }
 
-  async function handleBulkImport(csvText: string) {
-    const parsed = parseMoodleCSV(csvText);
-    if (parsed.length === 0) return;
-    const res = await bulkImportStudents(context.id, parsed);
+  async function handleBulkImport() {
+    if (!importPreview) return;
+    const validData = importPreview.data.filter(s => !s.error);
+    if (validData.length === 0) return;
+    
+    setIsPending(true);
+    const res = await bulkImportStudents(context.id, validData);
+    setIsPending(false);
+    
     if (res.ok) {
       setStudents(prev => [...prev, ...res.data]);
+      setImportPreview(null);
       router.refresh();
     }
+  }
+
+  function handleFileSelect(text: string, fileName: string) {
+    const parsed = parseMoodleCSV(text);
+    setImportPreview({ data: parsed.data, fileName });
   }
 
   useEffect(() => {
     setStudents(context.students);
   }, [context.students]);
 
-  const sortedStudents = useMemo(() => {
-    const arr = [...students];
+  const filteredStudents = useMemo(() => {
+    let arr = [...students];
+
+    // Search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      arr = arr.filter(s =>
+        (s.student_name ?? "").toLowerCase().includes(term) ||
+        (s.last_name ?? "").toLowerCase().includes(term) ||
+        (s.student_code ?? "").toLowerCase().includes(term) ||
+        (s.student_email ?? "").toLowerCase().includes(term)
+      );
+    }
+
+    // Sort logic
     arr.sort((a, b) => {
       const valA = (a[sortKey] ?? "").toLowerCase();
       const valB = (b[sortKey] ?? "").toLowerCase();
@@ -150,7 +210,7 @@ export function StudentsTab({ context }: StudentsTabProps) {
       return sortDirection === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
     return arr;
-  }, [students, sortDirection, sortKey]);
+  }, [students, sortDirection, sortKey, searchTerm]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -176,8 +236,14 @@ export function StudentsTab({ context }: StudentsTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Alumnado</h2>
+        <Input
+          placeholder="Buscar alumno..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full sm:w-64"
+        />
       </div>
 
       {/* Add student form */}
@@ -218,7 +284,86 @@ export function StudentsTab({ context }: StudentsTabProps) {
       </div>
 
       {/* Bulk import */}
-      <BulkImportForm onImport={handleBulkImport} />
+      <BulkImportForm onSelect={handleFileSelect} />
+
+      {importPreview && (
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileUp className="h-5 w-5 text-zinc-500" />
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Vista previa de importación: {importPreview.fileName}</h3>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setImportPreview(null)} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-zinc-100 dark:bg-zinc-900 shadow-sm">
+                <tr>
+                  <th className="px-3 py-2 text-left w-10">#</th>
+                  <th className="px-3 py-2 text-left">ID</th>
+                  <th className="px-3 py-2 text-left">Apellidos</th>
+                  <th className="px-3 py-2 text-left">Nombre</th>
+                  <th className="px-3 py-2 text-left">Email</th>
+                  <th className="px-3 py-2 text-left">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {importPreview.data.map((row, i) => (
+                  <tr key={i} className={cn(row.error ? "bg-red-50/30 dark:bg-red-900/10" : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50")}>
+                    <td className="px-3 py-1.5 text-zinc-400">{i + 1}</td>
+                    <td className="px-3 py-1.5 font-mono text-zinc-400">{row.student_code || "—"}</td>
+                    <td className="px-3 py-1.5">{row.last_name || "—"}</td>
+                    <td className="px-3 py-1.5 font-medium">{row.student_name || "—"}</td>
+                    <td className="px-3 py-1.5">{row.student_email || "—"}</td>
+                    <td className="px-3 py-1.5">
+                      {row.error ? (
+                        <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                          <AlertCircle className="h-3 w-3" />
+                          {row.error}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Válido
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-zinc-500">
+              Válidos: <span className="text-green-600 font-semibold">{importPreview.data.filter(s => !s.error).length}</span> / Total: {importPreview.data.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setImportPreview(null)}>Cancelar</Button>
+              <Button 
+                onClick={handleBulkImport} 
+                disabled={isPending || importPreview.data.filter(s => !s.error).length === 0} 
+                size="sm"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <UserPlus className="h-4 w-4 mr-1" />}
+                Confirmar Importación
+              </Button>
+            </div>
+          </div>
+          
+          {importPreview.data.some(s => s.error) && (
+            <Alert variant="destructive" className="py-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Se han detectado {importPreview.data.filter(s => s.error).length} registros con errores. Solo se importarán los registros válidos.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
 
       {/* Student list */}
       {students.length === 0 ? (
@@ -239,7 +384,7 @@ export function StudentsTab({ context }: StudentsTabProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {sortedStudents.map((s, i) => (
+              {filteredStudents.map((s, i) => (
                 <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
                   <td className="px-4 py-2 text-zinc-400 font-mono text-xs">{i + 1}</td>
                   <td className="px-4 py-2 font-mono text-xs text-zinc-500">{s.student_code || "—"}</td>
@@ -267,18 +412,20 @@ export function StudentsTab({ context }: StudentsTabProps) {
 }
 
 // ─── Bulk Import Form ────────────────────────────────────────────────────────
-function BulkImportForm({ onImport }: { onImport: (csv: string) => void }) {
-  const [fileName, setFileName] = useState("");
+function BulkImportForm({ onSelect }: { onSelect: (csv: string, fileName: string) => void }) {
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFileName(file.name);
+    setSelectedFile(file.name);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      if (text) onImport(text);
+      if (text) onSelect(text, file.name);
+      // Reset input to allow selecting same file again
+      e.target.value = "";
     };
     reader.readAsText(file, "UTF-8");
   }
@@ -288,15 +435,10 @@ function BulkImportForm({ onImport }: { onImport: (csv: string) => void }) {
       <label className="flex items-center gap-2 cursor-pointer rounded-md border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
         <input type="file" accept=".csv,text/csv" onChange={handleFileChange} className="hidden" />
         <FileUp className="h-4 w-4 text-zinc-500" />
-        <span className="text-zinc-700 dark:text-zinc-300">
-          {fileName || "Importar CSV..."}
+        <span className="text-zinc-700 dark:text-zinc-300 font-medium">
+          Seleccionar CSV de Moodle...
         </span>
       </label>
-      {fileName && (
-        <p className="text-xs text-zinc-400">
-          {fileName} seleccionado
-        </p>
-      )}
     </div>
   );
 }
