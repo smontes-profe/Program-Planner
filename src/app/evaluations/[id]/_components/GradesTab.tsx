@@ -468,9 +468,9 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                             {tri.adjustedIsManual && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <button type="button" onClick={() => resetTrimesterAdjusted(student.studentId, trimester)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30" aria-label="Restablecer ajuste">
+                                  <span role="button" onClick={() => resetTrimesterAdjusted(student.studentId, trimester)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer" aria-label="Restablecer ajuste">
                                     <PencilLine className="h-3 w-3" />
-                                  </button>
+                                  </span>
                                 </TooltipTrigger>
                                 <TooltipContent className="text-xs">Clic para restablecer al valor automático</TooltipContent>
                               </Tooltip>
@@ -502,9 +502,9 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                           {student.finalImprovedIsManual && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button type="button" onClick={() => resetFinalImproved(student.studentId)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30" aria-label="Restablecer nota final">
+                                <span role="button" onClick={() => resetFinalImproved(student.studentId)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer" aria-label="Restablecer nota final">
                                   <PencilLine className="h-3 w-3" />
-                                </button>
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent className="text-xs">Clic para restablecer al valor automático</TooltipContent>
                             </Tooltip>
@@ -592,9 +592,9 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                             {ra.improvedIsManual && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <button type="button" onClick={() => resetRAImproved(student.studentId, column.raId)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30" aria-label="Restablecer nota RA">
+                                  <span role="button" onClick={() => resetRAImproved(student.studentId, column.raId)} className="rounded p-0.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer" aria-label="Restablecer nota RA">
                                     <PencilLine className="h-3 w-3" />
-                                  </button>
+                                  </span>
                                 </TooltipTrigger>
                                 <TooltipContent className="text-xs">Clic para restablecer al valor automático</TooltipContent>
                               </Tooltip>
@@ -608,7 +608,7 @@ export function GradesTab({ contextId, gradesResult }: GradesTabProps) {
                             {ra.priPmiImpacts.length > 0 && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <button type="button" className="rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-600">PRI</button>
+                                  <span className="rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-600 cursor-help">PRI</span>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-[280px] text-xs">
                                   {ra.priPmiImpacts.map(impact => (

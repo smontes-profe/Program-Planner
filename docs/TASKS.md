@@ -169,36 +169,16 @@ Nuevo módulo de Evaluaciones al mismo nivel que Plantillas de Currículo y Prog
   - `company`
 - [ ] Ensure no automatic source sync after import.
 
-## Phase 5 - Teaching Planning (UTs e Instrumentos)
-
-- [ ] CRUD for teaching units / Unidades de Trabajo (UT).
-- [ ] Map UT <-> CE (many-to-many).
-- [ ] Assign UT to trimester (`T1`, `T2`, `T3`).
-- [ ] Build trimester coverage summaries.
-
 ## Phase 6 - Evaluation Engine
 
-- [ ] CRUD for evaluation instruments.
-- [ ] Support default and custom instrument types.
-- [ ] Define CE coverage per instrument.
-- [ ] Implement grade entry (`simple` and `advanced`).
-- [ ] Implement aggregate calculations (CE, RA, final + completion metrics).
 - [ ] Add unit tests for formulas and edge cases.
-
-## Phase 7 - Organization Management and Admin
-
-- [ ] Build organization member management for org managers.
-- [ ] Build role assignment guardrails.
-- [ ] Build platform admin moderation tools.
 
 ## Phase 8 - CI/CD and Release
 
 - [ ] GitHub Actions: lint + typecheck + test on PR.
 - [ ] Branch strategy: `develop` -> development deploy, `main` -> production deploy.
-- [x] Add Vercel deploy workflow scaffold for `develop` (preview) and `main` (production).
 - [x] Configure GitHub secrets (`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`).
 - [x] Vercel environment segregation.
-- [ ] Block merge on failed quality checks.
 - [x] Corregir tipado del Route Handler `import-grades` para Next 16 (`params` como `Promise`) y evitar fallo de `next build` en Vercel.
 
 ## Phase 8.1 - UX Quality Gates
