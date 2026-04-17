@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { GradeMatrixCsvImport } from "./GradeMatrixCsvImport";
-import { type EvaluationContextFull, type InstrumentScore, type Trimester } from "@/domain/evaluation/types";
+import { type EvaluationContextFull, type InstrumentScore, type TrimesterKey } from "@/domain/evaluation/types";
 import type { TeachingPlanFull } from "@/domain/teaching-plan/types";
 import { upsertInstrumentScore } from "@/domain/evaluation/actions";
 
@@ -33,14 +33,14 @@ interface InstrumentColumn {
   instrumentId: string;
   instrumentCode: string;
   instrumentName: string;
-  trimesters: Trimester[];
+  trimesters: TrimesterKey[];
 }
 
 export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatrixTabProps) {
   const [scoreValues, setScoreValues] = useState<Record<string, string>>(() => buildScoreMap(scores));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const [selectedTrimesters, setSelectedTrimesters] = useState<Set<Trimester>>(new Set(["T1", "T2", "T3"]));
+  const [selectedTrimesters, setSelectedTrimesters] = useState<Set<TrimesterKey>>(new Set(["T1", "T2", "T3"]));
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
         .filter(instrument => !instrument.is_pri_pmi)
         .map(instrument => {
           // Determine trimesters for this instrument from its units
-          const instTrimesters: Trimester[] = [];
+          const instTrimesters: TrimesterKey[] = [];
           const instUnits = units.filter(u => (instrument.unit_ids || []).includes(u.id));
           if (instUnits.some(u => u.active_t1)) instTrimesters.push("T1");
           if (instUnits.some(u => u.active_t2)) instTrimesters.push("T2");
@@ -193,7 +193,7 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
         {/* Trimester filters */}
         <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
           <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mr-2">Filtrar por trimestre:</span>
-          {(["T1", "T2", "T3"] as Trimester[]).map(t => (
+          {(["T1", "T2", "T3"] as TrimesterKey[]).map(t => (
             <label key={t} className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200 cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
               <Checkbox 
                 checked={selectedTrimesters.has(t)} 
