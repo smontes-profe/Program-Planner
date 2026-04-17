@@ -73,7 +73,7 @@ export function EvalTabs({ context, gradesResult, plans, scores, scoreError }: E
           />
         )}
         {activeTab === "grades" && <GradesTab contextId={context.id} gradesResult={gradesResult} />}
-        {activeTab === "export" && <ExportTab context={context} gradesResult={gradesResult} />}
+        {activeTab === "export" && <ExportTab context={context} gradesResult={gradesResult} plans={plans} scores={scores} />}
       </div>
     </div>
   );

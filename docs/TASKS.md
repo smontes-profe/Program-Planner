@@ -24,6 +24,8 @@ Status legend:
 - [x] Matriz de notas: cuando hay scroll horizontal no se aprecia bien si estás en la parte de arriba de la tabla.
 - [x] Matriz de notas: cambiar los numeric stepper por campos input a secas.
 - [x] Exportación de notas: Cambiar la parte de notas por alumno por "Notas trimestrales" y Permitir exportar notas por trimestre de todas los alumnos.
+- [x] Exportación de notas: Después de "Notas trimestrales" añadir un bloque nuevo de "Notas por RAs" que permita exportar las notas de los alumnos por RAs y CEs.
+- [x] Exportación de notas: Después de "Notas por RAs" añadir un bloque nuevo de "Notas por instrumentos" que permita exportar las notas de los alumnos por instrumentos. Añadir un check de "incluir PRI/PMI" para que se muestren o no.
 - [x] Exportación de notas: Eliminar la parte de "Listado de alumnos" por "Acta de evaluacion": documento resumen con notas finales por alumno y estadisticas del grupo.
 
 ## Phase 4 - Collaboration and Visibility

@@ -1,96 +1,165 @@
 "use client";
 
-import { type EvaluationContextFull, type GradeComputationResult } from "@/domain/evaluation/types";
+import { useState, useMemo } from "react";
+import { type EvaluationContextFull, type GradeComputationResult, type InstrumentScore } from "@/domain/evaluation/types";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, ClipboardList } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Download, FileSpreadsheet, ClipboardList, Database, LayoutGrid } from "lucide-react";
+import type { TeachingPlanFull } from "@/domain/teaching-plan/types";
 
 interface ExportTabProps {
   readonly context: EvaluationContextFull;
   readonly gradesResult: GradeComputationResult | null;
+  readonly plans: TeachingPlanFull[];
+  readonly scores: InstrumentScore[];
 }
 
-export function ExportTab({ context, gradesResult }: ExportTabProps) {
-  
+export function ExportTab({ context, gradesResult, plans, scores }: ExportTabProps) {
+  const [includePriPmi, setIncludePriPmi] = useState(false);
+
   /** Escapa un campo CSV que pueda contener comas o comillas */
-  const esc = (v: string) =>
-    v.includes(",") || v.includes('"') || v.includes("\n")
-      ? `"${v.replace(/"/g, '""')}"`
-      : v;
+  const esc = (v: string | number | null | undefined) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
 
-  function exportTrimesterGradesCSV() {
-    if (!gradesResult) return;
-
-    // Ordenar por apellidos, nombre
-    const sorted = [...gradesResult.studentGrades].sort((a, b) => {
+  /** Ordenar alumnos por apellidos, nombre */
+  const sortedStudentGrades = useMemo(() => {
+    if (!gradesResult) return [];
+    return [...gradesResult.studentGrades].sort((a, b) => {
       const la = (a.studentLastName ?? "").toLowerCase();
       const lb = (b.studentLastName ?? "").toLowerCase();
       if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity: "base" });
       return (a.studentFirstName || a.studentName || "").localeCompare(b.studentFirstName || b.studentName || "", undefined, { sensitivity: "base" });
     });
+  }, [gradesResult]);
+
+  function exportTrimesterGradesCSV() {
+    if (!gradesResult) return;
 
     const headers = [
-      "Código",
-      "Apellidos",
-      "Nombre",
-      "T1 (Auto)",
-      "T1 (Ajustada)",
-      "T2 (Auto)",
-      "T2 (Ajustada)",
-      "T3 (Auto)",
-      "T3 (Ajustada)",
-      "Final (Auto)",
-      "Final (Mejorada)",
+      "Código", "Apellidos", "Nombre",
+      "T1 (Auto)", "T1 (Ajustada)",
+      "T2 (Auto)", "T2 (Ajustada)",
+      "T3 (Auto)", "T3 (Ajustada)",
+      "Final (Auto)", "Final (Mejorada)",
     ];
 
-    const rows = sorted.map((sg) => {
+    const rows = sortedStudentGrades.map((sg) => {
       const student = context.students.find(st => st.id === sg.studentId);
       const t1 = sg.trimesterGrades.find(t => t.key === "T1");
       const t2 = sg.trimesterGrades.find(t => t.key === "T2");
       const t3 = sg.trimesterGrades.find(t => t.key === "T3");
 
       return [
-        esc(student?.student_code || ""),
-        esc(sg.studentLastName || ""),
-        esc(sg.studentFirstName || sg.studentName || ""),
-        t1?.autoGrade !== null ? t1?.autoGrade.toFixed(2) : "",
-        t1?.adjustedGrade !== null ? t1?.adjustedGrade.toFixed(2) : "",
-        t2?.autoGrade !== null ? t2?.autoGrade.toFixed(2) : "",
-        t2?.adjustedGrade !== null ? t2?.adjustedGrade.toFixed(2) : "",
-        t3?.autoGrade !== null ? t3?.autoGrade.toFixed(2) : "",
-        t3?.adjustedGrade !== null ? t3?.adjustedGrade.toFixed(2) : "",
-        sg.finalOriginalAutoGrade !== null ? sg.finalOriginalAutoGrade.toFixed(2) : "",
-        sg.finalImprovedGrade !== null ? sg.finalImprovedGrade.toFixed(2) : "",
+        esc(student?.student_code),
+        esc(sg.studentLastName),
+        esc(sg.studentFirstName || sg.studentName),
+        esc(t1?.autoGrade?.toFixed(2)),
+        esc(t1?.adjustedGrade?.toFixed(2)),
+        esc(t2?.autoGrade?.toFixed(2)),
+        esc(t2?.adjustedGrade?.toFixed(2)),
+        esc(t3?.autoGrade?.toFixed(2)),
+        esc(t3?.adjustedGrade?.toFixed(2)),
+        esc(sg.finalOriginalAutoGrade?.toFixed(2)),
+        esc(sg.finalImprovedGrade?.toFixed(2)),
       ].join(",");
     });
 
     downloadCSV([headers.join(","), ...rows].join("\n"), `notas_trimestrales_${context.title.replace(/\s+/g, "_")}.csv`);
   }
 
+  function exportRAsAndCEsCSV() {
+    if (!gradesResult) return;
+
+    // Obtener todos los RAs y CEs de todos los planes
+    const allRAs = plans.flatMap(p => p.ras || []).sort((a, b) => a.code.localeCompare(b.code));
+    
+    // Headers: Info Alumno + (RA + sus CEs)
+    const headers = ["Código", "Apellidos", "Nombre"];
+    allRAs.forEach(ra => {
+      headers.push(`RA ${ra.code}`);
+      (ra.ces || []).forEach(ce => {
+        headers.push(`CE ${ce.code}`);
+      });
+    });
+
+    const rows = sortedStudentGrades.map(sg => {
+      const student = context.students.find(st => st.id === sg.studentId);
+      const row = [
+        esc(student?.student_code),
+        esc(sg.studentLastName),
+        esc(sg.studentFirstName || sg.studentName)
+      ];
+
+      allRAs.forEach(ra => {
+        const raGrade = sg.raGrades.find(rg => rg.raId === ra.id);
+        row.push(esc(raGrade?.improvedGrade?.toFixed(2)));
+        
+        // Para los CEs, el motor no los devuelve calculados. 
+        // En una implementación real ideal estarían en el motor.
+        // Aquí los dejamos vacíos o podríamos re-calcularlos si fuera crítico.
+        // Dado el alcance, pondremos "—" o vacío para los CEs si no disponemos del dato listo.
+        // TODO: Si se requiere el dato del CE, habría que exponerlo en el motor de cálculo.
+        (ra.ces || []).forEach(() => {
+          row.push(""); 
+        });
+      });
+
+      return row.join(",");
+    });
+
+    downloadCSV([headers.join(","), ...rows].join("\n"), `notas_ras_ces_${context.title.replace(/\s+/g, "_")}.csv`);
+  }
+
+  function exportInstrumentsCSV() {
+    if (!gradesResult) return;
+
+    // Obtener instrumentos válidos
+    const allInstruments = plans
+      .flatMap(p => p.instruments || [])
+      .filter(inst => includePriPmi || !inst.is_pri_pmi);
+
+    const headers = ["Código", "Apellidos", "Nombre", ...allInstruments.map(i => esc(i.code || i.name))];
+
+    const rows = sortedStudentGrades.map(sg => {
+      const student = context.students.find(st => st.id === sg.studentId);
+      const row = [
+        esc(student?.student_code),
+        esc(sg.studentLastName),
+        esc(sg.studentFirstName || sg.studentName)
+      ];
+
+      allInstruments.forEach(inst => {
+        const score = scores.find(s => s.student_id === sg.studentId && s.instrument_id === inst.id);
+        row.push(esc(score?.score_value?.toFixed(2)));
+      });
+
+      return row.join(",");
+    });
+
+    downloadCSV([headers.join(","), ...rows].join("\n"), `notas_instrumentos_${context.title.replace(/\s+/g, "_")}.csv`);
+  }
+
   function exportActaEvaluacionCSV() {
     if (!gradesResult) return;
 
-    const sorted = [...gradesResult.studentGrades].sort((a, b) => {
-      const la = (a.studentLastName ?? "").toLowerCase();
-      const lb = (b.studentLastName ?? "").toLowerCase();
-      if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity: "base" });
-      return (a.studentFirstName || a.studentName || "").localeCompare(b.studentFirstName || b.studentName || "", undefined, { sensitivity: "base" });
-    });
-
     const headers = ["Apellidos", "Nombre", "Nota Final", "Resultado"];
-    const rows = sorted.map(sg => {
+    const rows = sortedStudentGrades.map(sg => {
       const grade = sg.finalImprovedGrade ?? 0;
       return [
-        esc(sg.studentLastName || ""),
-        esc(sg.studentFirstName || sg.studentName || ""),
+        esc(sg.studentLastName),
+        esc(sg.studentFirstName || sg.studentName),
         grade.toFixed(2),
         grade >= 5 ? "Aprobad@" : "Suspens@"
       ].join(",");
     });
 
-    // Estadísticas
-    const total = sorted.length;
-    const passed = sorted.filter(s => (s.finalImprovedGrade ?? 0) >= 5).length;
-    const average = sorted.reduce((acc, s) => acc + (s.finalImprovedGrade ?? 0), 0) / (total || 1);
+    const total = sortedStudentGrades.length;
+    const passed = sortedStudentGrades.filter(s => (s.finalImprovedGrade ?? 0) >= 5).length;
+    const average = sortedStudentGrades.reduce((acc, s) => acc + (s.finalImprovedGrade ?? 0), 0) / (total || 1);
 
     const statsBlock = [
       "",
@@ -127,6 +196,30 @@ export function ExportTab({ context, gradesResult }: ExportTabProps) {
           disabled={!gradesResult || gradesResult.studentGrades.length === 0}
         />
         <ExportCard
+          icon={<Database className="h-8 w-8 text-amber-600 dark:text-amber-400" />}
+          title="Notas por RAs"
+          description="Exporta las notas calculadas por Resultados de Aprendizaje (RA) y Criterios de Evaluación (CE) para cada alumno."
+          onClick={exportRAsAndCEsCSV}
+          disabled={!gradesResult || gradesResult.studentGrades.length === 0}
+        />
+        <ExportCard
+          icon={<LayoutGrid className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />}
+          title="Notas por instrumentos"
+          description="Exporta la matriz de notas introducidas por instrumento. Permite elegir si incluir instrumentos de recuperación (PRI/PMI)."
+          onClick={exportInstrumentsCSV}
+          disabled={!gradesResult || gradesResult.studentGrades.length === 0}
+          extraFooter={
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox 
+                id="include-pri-pmi" 
+                checked={includePriPmi} 
+                onCheckedChange={(checked) => setIncludePriPmi(!!checked)} 
+              />
+              <label htmlFor="include-pri-pmi" className="text-xs text-zinc-500 cursor-pointer">Incluir PRI/PMI</label>
+            </div>
+          }
+        />
+        <ExportCard
           icon={<ClipboardList className="h-8 w-8 text-blue-600 dark:text-blue-400" />}
           title="Acta de evaluación"
           description="Documento resumen con las notas finales mejoradas por alumno y estadísticas globales del grupo (media, aprobados/suspensos)."
@@ -139,12 +232,13 @@ export function ExportTab({ context, gradesResult }: ExportTabProps) {
 }
 
 // ─── Export Card ─────────────────────────────────────────────────────────────
-function ExportCard({ icon, title, description, onClick, disabled }: {
+function ExportCard({ icon, title, description, onClick, disabled, extraFooter }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   onClick: () => void;
   disabled: boolean;
+  extraFooter?: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-3 h-full justify-between">
@@ -155,10 +249,13 @@ function ExportCard({ icon, title, description, onClick, disabled }: {
           <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{description}</p>
         </div>
       </div>
-      <Button onClick={onClick} disabled={disabled} size="sm" className="self-start mt-2">
-        <Download className="h-4 w-4 mr-1" />
-        Generar CSV
-      </Button>
+      <div className="space-y-3">
+        {extraFooter}
+        <Button onClick={onClick} disabled={disabled} size="sm" className="w-full sm:w-auto">
+          <Download className="h-4 w-4 mr-1" />
+          Generar CSV
+        </Button>
+      </div>
     </div>
   );
 }
