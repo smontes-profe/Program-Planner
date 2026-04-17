@@ -228,11 +228,11 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
               Esta programación no tiene instrumentos definidos todavía.
             </div>
           ) : (
-            <div className="overflow-x-auto max-w-full rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <div className="overflow-auto max-w-full max-h-[70vh] rounded-xl border border-zinc-200 dark:border-zinc-800 relative">
               <table className="w-full min-w-[640px] text-sm">
-                <thead>
-            <tr className="bg-zinc-50 text-left text-xs font-semibold tracking-wide text-zinc-600 dark:bg-zinc-900/50 dark:text-zinc-400">
-              <th className="px-4 py-3">Alumno</th>
+                <thead className="sticky top-0 z-20 bg-zinc-50 dark:bg-zinc-900 shadow-sm border-b border-zinc-200 dark:border-zinc-800">
+            <tr className="text-left text-xs font-semibold tracking-wide text-zinc-600 dark:text-zinc-400">
+              <th className="px-4 py-3 sticky left-0 z-30 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 min-w-[200px]">Alumno</th>
               {group.columns.map(column => (
                 <th key={column.instrumentId} className="px-2 py-2">
                   <div className="space-y-1">
@@ -250,7 +250,7 @@ export function GradeMatrixTab({ context, plans, scores, scoreError }: GradeMatr
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {studentRows.map(student => (
                     <tr key={student.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30">
-                    <td className="px-4 py-3 align-top w-[220px]">
+                    <td className="px-4 py-3 align-top w-[220px] sticky left-0 z-10 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800">
                       <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-50 leading-tight">
                         {student.last_name ? `${student.last_name}, ${student.student_name}` : student.student_name}
                       </div>
