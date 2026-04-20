@@ -16,20 +16,21 @@ Status legend:
 ## Phase 4 - Ongoing feedback and improvements
 
 - [P1][x] Better responsiveness for different desktop resolutions (specially big ones).
-- [P1][ ] Currículos: El panel de edición de RAs y CEs es demasiado grande. Hay que dejarlo a la mitad.
-- [P1][ ] Currículos: El panel de "añadir módulo completo", sin embargo, se queda muy estrecho. Que se quede al mismo ancho que el de edición de RAs y CEs (una vez ajustados estos).
+- [P1][x] Currículos: El panel de edición de RAs y CEs es demasiado grande. Hay que dejarlo a la mitad.
+- [P1][x] Currículos: El panel de "añadir módulo completo", sin embargo, se queda muy estrecho. Que se quede al mismo ancho que el de edición de RAs y CEs (una vez ajustados estos).
 
-## Phase 5 - Collaboration and Visibility
+
+## Phase 5 - Evaluation Engine
+
+- [P1] [ ] Add unit tests for formulas and edge cases.
+
+## Phase 6 - Collaboration and Visibility
 
 - [x] Implement deep import/fork from template.
 - [P2][ ] Implement deep import/fork from published plan (including UTs and instruments).
 - [x] Persist lineage (`source_*`, `imported_at`).
 - [P2][ ] Implement visibility-based exploration and import UI (search/browse other teachers' plans).
 - [x] Ensure no automatic source sync after import.
-
-## Phase 6 - Evaluation Engine
-
-- [P1] [ ] Add unit tests for formulas and edge cases.
 
 ### Phase 9 - Futuro: Congelación de notas por trimestre (Opción B)
 
