@@ -15,7 +15,9 @@ Status legend:
 
 ## Phase 4 - Ongoing feedback and improvements
 
-- [P1][ ] Better responsiveness for different desktop resolutions (specially big ones).
+- [P1][x] Better responsiveness for different desktop resolutions (specially big ones).
+- [P1][ ] Currículos: El panel de edición de RAs y CEs es demasiado grande. Hay que dejarlo a la mitad.
+- [P1][ ] Currículos: El panel de "añadir módulo completo", sin embargo, se queda muy estrecho. Que se quede al mismo ancho que el de edición de RAs y CEs (una vez ajustados estos).
 
 ## Phase 5 - Collaboration and Visibility
 

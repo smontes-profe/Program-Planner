@@ -90,7 +90,7 @@ export function BulkAddRAButton({ templateId }: BulkAddRAButtonProps) {
           <Layers className="h-4 w-4 mr-1.5" /> Añadir Módulo Completo
         </div>
       </SheetTrigger>
-      <SheetContent side="right" className="bg-white dark:bg-zinc-950 sm:max-w-lg w-full flex flex-col h-full p-0">
+      <SheetContent side="right" className="bg-white dark:bg-zinc-950 sm:max-w-md w-full flex flex-col h-full p-0">
         <div className="px-6 pt-6 pb-2 shrink-0 border-b border-zinc-100 dark:border-zinc-800">
           <SheetHeader>
             <SheetTitle>Añadir RAs y Criterios (Módulo Completo)</SheetTitle>
