@@ -182,7 +182,7 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
     setCeWeights(prev => ({ ...prev, [ceId]: num }));
   };
 
-  // Helper: compute remaining coverage for a RA (100 - sum of other instruments' coverage for this RA)
+  // Helper: compute remaining coverage for a RA as a signed balance.
   const getRemainingCoverage = (raId: string): number => {
     const otherInstrumentsCoverage = (plan.instruments || [])
       .filter(inst => !inst.is_pri_pmi && inst.id !== initialData?.id)
@@ -191,7 +191,7 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
         return sum + (Number(rc?.coverage_percent) || 0);
       }, 0);
     const currentCoverage = raCoverages[raId] ?? 0;
-    return Math.max(0, 100 - otherInstrumentsCoverage - currentCoverage);
+    return 100 - otherInstrumentsCoverage - currentCoverage;
   };
 
   // Helper: compute the CE sum for a given RA
@@ -330,22 +330,27 @@ function InstrumentForm({ plan, initialData, onSubmit, onCancel, isPending, erro
                   <div className="flex items-center gap-2 shrink-0">
                     {(() => {
                       const remaining = getRemainingCoverage(ra.id);
+                      const isBalanced = Math.abs(remaining) < 0.1;
                       return (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className={cn(
                               "text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded",
-                              remaining === 0
+                              isBalanced
                                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                                 : remaining < 0
                                   ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
                                   : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                             )}>
-                              {remaining > 0 ? `${remaining.toFixed(0)}% libre` : remaining === 0 ? "100% ✓" : `${Math.abs(remaining).toFixed(0)}% exceso`}
+                              {remaining > 0
+                                ? `${remaining.toFixed(0)}% libre`
+                                : isBalanced
+                                  ? "100% ✓"
+                                  : `${Math.abs(remaining).toFixed(0)}% exceso`}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent className="text-xs">
-                            Porcentaje del RA aún sin cubrir por otros instrumentos
+                            Saldo del RA tras sumar la cobertura del resto de instrumentos
                           </TooltipContent>
                         </Tooltip>
                       );
